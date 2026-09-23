@@ -1,9 +1,18 @@
 const express = require('express');
-const machineController = require('../controllers/machine.controller');
+const machineService = require('../services/machine.service');
+const { handle } = require('./util');
 
 const router = express.Router();
 
-router.get('/', machineController.getMachines);
-router.get('/:machineId', machineController.getMachineById);
+router.get('/', handle(() => {
+  const machines = machineService.getAllMachines();
+  return { count: machines.length, machines };
+}));
+
+router.get('/:machineId', handle((req, res) => {
+  const view = machineService.getMachineView(req.params.machineId);
+  if (!view) return res.status(404).json({ error: `Machine with ID '${req.params.machineId}' not found` });
+  return view;
+}));
 
 module.exports = router;

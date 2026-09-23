@@ -2,11 +2,12 @@ import { CheckCircle2, AlertOctagon, RotateCcw, ArrowLeft, Award } from 'lucide-
 import PrimaryButton from '../../components/PrimaryButton';
 import { PASS_RATIO } from '../scenarioEngine';
 
-export default function SimResults({ module, state, maxScore, onRetry, onExit }) {
+export default function SimResults({ module, state, maxScore, saved, onRetry, onExit }) {
   const endNode = module.nodes[state.nodeId];
   const ratio = maxScore > 0 ? Math.max(0, state.score) / maxScore : 0;
   const passed = state.outcome !== 'FAIL' && ratio >= PASS_RATIO;
-  const xp = passed ? Math.round(module.xp * Math.min(1, ratio)) : 0;
+  // The backend awards XP only for beating your previous best on this module.
+  const xp = saved && !saved.error ? saved.xpAwarded : passed ? Math.round(module.xp * Math.min(1, ratio)) : 0;
 
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-black/70 p-4">

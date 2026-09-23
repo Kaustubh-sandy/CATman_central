@@ -2,25 +2,46 @@
   {
     "operatorId": "OP1001",
     "name": "Arjun Mehta",
-    "pin": "1234",
     "experienceYears": 6,
     "certifications": ["Excavator Level 2", "Confined Space"],
-    "assignedMachineId": "EXC001"
+    "assignedMachineId": "EXC001",
+    "language": "en",
+    "xp": 0
   },
   {
     "operatorId": "OP1002",
     "name": "Priya Nair",
-    "pin": "2345",
     "experienceYears": 3,
     "certifications": ["Excavator Level 1"],
-    "assignedMachineId": "EXC002"
+    "assignedMachineId": "EXC002",
+    "language": "ta",
+    "xp": 0
   },
   {
     "operatorId": "OP1003",
     "name": "Ravi Kumar",
-    "pin": "3456",
     "experienceYears": 9,
     "certifications": ["Excavator Level 3", "Rollover Prevention"],
-    "assignedMachineId": "EXC003"
+    "assignedMachineId": "EXC003",
+    "language": "hi",
+    "xp": 0
+  },
+  {
+    "operatorId": "OP1004",
+    "name": "Meena Pillai",
+    "experienceYears": 2,
+    "certifications": ["Excavator Level 1"],
+    "assignedMachineId": "EXC002",
+    "language": "ta",
+    "xp": 0
+  },
+  {
+    "operatorId": "OP1005",
+    "name": "Suresh Yadav",
+    "experienceYears": 12,
+    "certifications": ["Excavator Level 3", "Trainer"],
+    "assignedMachineId": "EXC003",
+    "language": "hi",
+    "xp": 0
   }
 ]

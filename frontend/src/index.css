@@ -27,3 +27,10 @@ html[data-theme='sun'] body {
 .font-tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* Section the assistant just navigated to. */
+.focus-flash {
+  outline: 4px solid #ffcd11;
+  outline-offset: 4px;
+  transition: outline-color 0.3s;
+}

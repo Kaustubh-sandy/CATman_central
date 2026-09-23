@@ -1,9 +1,10 @@
 import { CheckCircle2, AlertTriangle, AlertOctagon } from 'lucide-react';
+import { useLive } from '../context/LiveContext';
 
 const STATUS_MAP = {
-  ONLINE: { label: 'ONLINE', tone: 'ok', Icon: CheckCircle2 },
-  STALE: { label: 'STALE', tone: 'warn', Icon: AlertTriangle },
-  OFFLINE: { label: 'OFFLINE', tone: 'danger', Icon: AlertOctagon },
+  ONLINE: { tone: 'ok', Icon: CheckCircle2 },
+  STALE: { tone: 'warn', Icon: AlertTriangle },
+  OFFLINE: { tone: 'danger', Icon: AlertOctagon },
 };
 
 const TONE_CLASSES = {
@@ -13,15 +14,16 @@ const TONE_CLASSES = {
 };
 
 export default function StatusPill({ status, className = '' }) {
-  const entry = STATUS_MAP[status] || STATUS_MAP.OFFLINE;
-  const { label, tone, Icon } = entry;
+  const { t } = useLive();
+  const key = STATUS_MAP[status] ? status : 'OFFLINE';
+  const { tone, Icon } = STATUS_MAP[key];
 
   return (
     <span
       className={`inline-flex items-center gap-2 rounded border-2 px-3 py-1.5 font-condensed font-semibold uppercase tracking-wide ${TONE_CLASSES[tone]} ${className}`}
     >
       <Icon size={20} strokeWidth={2.5} aria-hidden="true" />
-      {label}
+      {t(`status.${key}`)}
     </span>
   );
 }

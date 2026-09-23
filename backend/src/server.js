@@ -2,80 +2,91 @@ const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const config = require('./config/env');
+const repo = require('./db/repo');
+const { ensureSeeded } = require('./db/seed');
 const { initSocket } = require('./socket/socket');
-const { seedInitialMachines } = require('./services/machine.service');
 const mqttService = require('./services/mqtt.service');
-
-const healthRoutes = require('./routes/health.routes');
-const machineRoutes = require('./routes/machine.routes');
-const fleetRoutes = require('./routes/fleet.routes');
-const taskRoutes = require('./routes/task.routes');
-const operatorRoutes = require('./routes/operator.routes');
-const siteRoutes = require('./routes/site.routes');
-const trainingRoutes = require('./routes/training.routes');
+const siteService = require('./services/site.service');
+const precheckService = require('./services/precheck.service');
+const shiftService = require('./services/shift.service');
+const alertService = require('./services/alert.service');
+const idleLessonService = require('./services/idleLesson.service');
+const taskService = require('./services/task.service');
+const bus = require('./services/bus');
 
 const app = express();
 const server = http.createServer(app);
 
-// Initialize Socket.IO on the HTTP server
 initSocket(server);
 
-// Middleware
-app.use(
-  cors({
-    origin: [config.clientUrl, 'http://localhost:5173', 'http://127.0.0.1:5173'],
-    credentials: true,
-  })
-);
+app.use(cors(config.corsOptions));
 app.use(express.json());
 
-// Routes
-app.use('/api/health', healthRoutes);
-app.use('/api/machines', machineRoutes);
-app.use('/api/fleet', fleetRoutes);
-app.use('/api/tasks', taskRoutes);
-app.use('/api/operators', operatorRoutes);
-app.use('/api/site', siteRoutes);
-app.use('/api/training', trainingRoutes);
+app.use('/api/health', require('./routes/health.routes'));
+app.use('/api/machines', require('./routes/machine.routes'));
+app.use('/api/fleet', require('./routes/fleet.routes'));
+app.use('/api/operators', require('./routes/operator.routes'));
+app.use('/api/tasks', require('./routes/task.routes'));
+app.use('/api/shift', require('./routes/shift.routes'));
+app.use('/api/alerts', require('./routes/alert.routes'));
+app.use('/api/incidents', require('./routes/incident.routes'));
+app.use('/api/training', require('./routes/training.routes'));
+app.use('/api/assistant', require('./routes/assistant.routes'));
+app.use('/api/site', require('./routes/site.routes'));
+app.use('/api/audit', require('./routes/audit.routes'));
 
-// 404 Handler for undefined routes
 app.use((req, res) => {
   res.status(404).json({ error: `Cannot ${req.method} ${req.originalUrl}` });
 });
 
-// Basic Error Handling Middleware
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  // Handle invalid JSON body
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     return res.status(400).json({ error: 'Malformed JSON payload in request' });
   }
-
-  console.error('[Server Error]', err);
   const status = err.status || 500;
-  return res.status(status).json({
-    error: err.message || 'Internal Server Error',
-  });
+  if (status >= 500) console.error('[Server Error]', err);
+  return res.status(status).json({ error: err.message || 'Internal Server Error', code: err.code || null });
 });
 
-// Start Server
-server.listen(config.port, config.host, async () => {
+async function start() {
   console.log('====================================================');
   console.log('       CAT SMART OPERATOR - BACKEND SERVICE         ');
   console.log('====================================================');
-  console.log(`Server running on: http://${config.host}:${config.port}`);
-  console.log(`Local Access:      http://localhost:${config.port}`);
-  console.log(`CORS Allowed:      ${config.clientUrl}`);
-  console.log('----------------------------------------------------');
 
-  // Seed default machines (EXC001, EXC002, EXC003) if not present
-  try {
-    await seedInitialMachines();
-  } catch (error) {
-    console.error('[Startup] Failed to verify/seed initial machines:', error.message);
-  }
+  await repo.init();
+  ensureSeeded();
 
-  // Connect to the MQTT broker and start listening for machine telemetry
+  siteService.init();
+  precheckService.init();
+  shiftService.init();
+  alertService.init({ shiftLookup: shiftService.getActiveShiftForMachine });
+  idleLessonService.init({ shiftLookup: shiftService.getActiveShiftForMachine });
+  bus.on('telemetry', (machineId, telemetry) => taskService.onTelemetry(machineId, telemetry));
+
   mqttService.init();
+
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`\n[Server] Port ${config.port} is already in use — another backend is probably running. Stop it first.\n`);
+      process.exit(1);
+    }
+    throw error;
+  });
+
+  server.listen(config.port, config.host, () => {
+    console.log(`Server running on: http://${config.host}:${config.port}`);
+    console.log(`Local Access:      http://localhost:${config.port}`);
+    console.log(`CORS Allowed:      ${config.clientUrl} (and any localhost / 127.0.0.1 port)`);
+    console.log(`Storage:           ${repo.getStatus().firestore ? 'Firestore + memory' : 'memory only'}`);
+    console.log(`Assistant:         ${config.gemini.apiKey ? `Gemini (${config.gemini.models[0]})` : 'offline keyword mode'}`);
+    console.log('----------------------------------------------------');
+  });
+}
+
+start().catch((err) => {
+  console.error('[Startup] Failed:', err);
+  process.exit(1);
 });
 
 module.exports = { app, server };

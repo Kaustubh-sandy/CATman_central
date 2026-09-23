@@ -7,6 +7,7 @@ import SimResults from './ui/SimResults';
 import { useScenario } from './scenarioEngine';
 import { createMachineState, EYE } from './machineModel';
 import { playHorn } from './audio';
+import { apiClient } from '../api/client';
 
 const HORN_MS = 600;
 const TOAST_MS = 3500;
@@ -158,6 +159,22 @@ export default function SimSession({ module, onExit, onRetry }) {
   useEffect(() => {
     setHintOn(false);
   }, [state.nodeId]);
+
+  // Save the result once the scenario ends (training progress + XP in Firestore).
+  const [saved, setSaved] = useState(null);
+  useEffect(() => {
+    if (state.status !== 'DONE') return;
+    apiClient
+      .post(`/training/modules/${module.id}/complete`, {
+        score: state.score,
+        maxScore: scenario.maxScore,
+        outcome: state.outcome,
+        violations: state.violations.map((v) => v.code),
+        hintsUsed: state.hintsUsed,
+      })
+      .then((res) => setSaved(res.data.record))
+      .catch(() => setSaved({ error: true }));
+  }, [state.status]); // only on the transition to DONE; the other values are final by then
   useEffect(() => {
     if (!state.feedback) return undefined;
     setVisibleFeedback(state.feedback);
@@ -215,7 +232,7 @@ export default function SimSession({ module, onExit, onRetry }) {
 
       {state.status === 'INTRO' && <SimIntro module={module} onStart={scenario.start} onExit={onExit} />}
       {state.status === 'DONE' && (
-        <SimResults module={module} state={state} maxScore={scenario.maxScore} onRetry={onRetry} onExit={onExit} />
+        <SimResults module={module} state={state} maxScore={scenario.maxScore} saved={saved} onRetry={onRetry} onExit={onExit} />
       )}
     </div>
   );

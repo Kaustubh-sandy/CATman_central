@@ -1,16 +1,18 @@
-export function formatRelativeTime(isoString) {
-  if (!isoString) return 'never';
+export function formatRelativeTime(isoString, t) {
+  if (!isoString) return t('time.never');
 
   const diffSec = Math.max(0, Math.round((Date.now() - new Date(isoString).getTime()) / 1000));
-
-  if (diffSec < 5) return 'just now';
-  if (diffSec < 60) return `${diffSec}s ago`;
+  if (diffSec < 5) return t('time.justNow');
+  if (diffSec < 60) return t('time.secondsAgo', { n: diffSec });
 
   const diffMin = Math.round(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffMin < 60) return t('time.minutesAgo', { n: diffMin });
 
-  const diffHour = Math.round(diffMin / 60);
-  return `${diffHour}h ago`;
+  return t('time.hoursAgo', { n: Math.round(diffMin / 60) });
+}
+
+export function formatClock(isoString) {
+  return isoString ? new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
 }
 
 export function toneForFuel(pct) {
@@ -30,6 +32,6 @@ export function toneForEngineTemp(value) {
 export function toneForHydraulicTemp(value) {
   if (!Number.isFinite(value)) return 'ok';
   if (value > 95) return 'danger';
-  if (value > 88) return 'warn';
+  if (value > 90) return 'warn';
   return 'ok';
 }

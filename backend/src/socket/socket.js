@@ -6,42 +6,39 @@ let io = null;
 function initSocket(server) {
   io = new Server(server, {
     cors: {
-      origin: [config.clientUrl, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+      ...config.corsOptions,
       methods: ['GET', 'POST'],
-      credentials: true,
     },
   });
 
   io.on('connection', (socket) => {
-    console.log(`[Socket.IO] Operator connected: ${socket.id}`);
+    console.log(`[Socket.IO] Client connected: ${socket.id}`);
 
     socket.on('disconnect', () => {
-      console.log(`[Socket.IO] Operator disconnected: ${socket.id}`);
+      console.log(`[Socket.IO] Client disconnected: ${socket.id}`);
     });
   });
 
   return io;
 }
 
+// No login yet, so every connected client (operator dashboard, control room)
+// receives every event and filters by machine/operator on its side.
+function emit(event, payload) {
+  if (io) io.emit(event, payload);
+}
+
 function broadcastTelemetry(telemetry) {
-  if (io) {
-    io.emit('machine:telemetry', telemetry);
-  }
+  emit('machine:telemetry', telemetry);
 }
 
 function broadcastConnectivity(update) {
-  if (io) {
-    io.emit('machine:connectivity', update);
-  }
-}
-
-function getIO() {
-  return io;
+  emit('machine:connectivity', update);
 }
 
 module.exports = {
   initSocket,
+  emit,
   broadcastTelemetry,
   broadcastConnectivity,
-  getIO,
 };

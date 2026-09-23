@@ -1,224 +1,270 @@
 # CAT Smart Operator — CATman_central
 
-The operator-side application: a `backend/` (Express + Socket.IO + MQTT) and a
-`frontend/` (React + Vite + Tailwind) dashboard. This is a sibling app to
-`../caterpillar-machine-simulator`, which is the machine side.
+The operator-side application: a `backend/` (Express + Socket.IO + MQTT +
+Firestore + Gemini) and a `frontend/` (React + Vite + Tailwind) dashboard.
+It talks to `../caterpillar-machine-simulator` (the machine side) over MQTT
+only.
 
-Implemented so far: the Dashboard (NOT_STARTED view) and the E-Learning page
-with a 3D excavator-cab training simulator (section 8). See
-`../IMPLEMENTATION_PLAN.md` for the full roadmap and UI guide.
+What works end to end:
+
+- **Shift flow**: pre-check → safety checklist → tasks → end shift → summary.
+- **Machine pre-check** in AUTO mode, or MANUAL mode where a person on the
+  machine side checks each sensor.
+- **Live safety alerts**: a full-width banner with an alarm, vibration and a
+  spoken warning in the operator's language, an alert centre, and a
+  black-box replay.
+- **SOS** (hold for 2 s) and a **Control Room** page for supervisors.
+- **Languages**: English, Hindi and Tamil across the UI, alerts and voice.
+- **Gemini assistant** that answers from live dashboard data and opens the
+  right screen.
+- **E-Learning**: a 3D cab simulator; XP and progress are saved.
+- **Task history** and **profile** (level, badges).
+- **Firestore** persistence, with an in-memory fallback.
 
 ---
 
-## Quick Start (backend + frontend)
+## Quick start
 
-You need an MQTT broker running at `mqtt://localhost:1883` for live machine
-data (e.g. [Mosquitto](https://mosquitto.org/download/) installed as a
-service, or `npm run broker` inside `backend/` for a throwaway dev broker).
-Without one, the backend still runs fine — the dashboard just shows every
-machine as OFFLINE until telemetry arrives.
+You need an MQTT broker on `mqtt://localhost:1883` (Mosquitto as a service,
+or `npm run broker` inside `backend/`).
 
-**Terminal 1 — backend** (`http://localhost:8000`):
 ```bash
+# Terminal 1 — backend (http://localhost:8000)
 cd backend
 npm install
+cp .env.example .env         # then fill in Firebase + Gemini keys (optional)
 npm run dev
-```
 
-**Terminal 2 — frontend** (`http://localhost:5173`):
-```bash
+# Terminal 2 — frontend (http://localhost:5173)
 cd frontend
 npm install
 npm run dev
+
+# Terminal 3 — machine simulator (control page http://localhost:3000)
+cd ../caterpillar-machine-simulator
+npm install
+npm start
 ```
 
-Open `http://localhost:5173` in a browser. To see live machine data instead
-of OFFLINE placeholders, also start the machine simulator — see section 4
-below ("Running it") for the full multi-process setup including MQTT and the
-simulator.
+Open the simulator control page, pick a machine (EXC001), and press
+**Start**. Then open the dashboard.
+
+**Choosing the operator (no login yet).** The dashboard uses OP1001 by
+default. Open `http://localhost:5173/?operator=OP1003` once to switch; the
+browser remembers the choice.
+
+| Operator | Machine | Language |
+|---|---|---|
+| OP1001 | EXC001 | English |
+| OP1002 | EXC002 | Tamil |
+| OP1003 | EXC003 | Hindi |
+| OP1004 | EXC002 | — |
+| OP1005 | EXC003 | — |
+
+The simulator control page drives the machine that the operator is assigned
+to, so start the matching machine (for example, EXC003 for OP1003).
 
 ---
 
 ## 1. Architecture
 
 ```
-caterpillar-machine-simulator            CATman_central
-┌───────────────────────┐                ┌──────────────────────────────────┐
-│  Machine (EXC001...)   │  MQTT          │  backend/                        │
-│  publishes telemetry   │─ ─ ─ ─ ─ ─ ─ ▶ │   mqtt.service       (subscribe) │
-│  to machines/{id}/     │  QoS 0         │   telemetryStore     (latest +   │
-│  telemetry             │                │                       history)  │
-└───────────────────────┘                │   connectivity.service (ONLINE/  │
-                                          │                     STALE/OFFLINE)│
-                                          │   REST API  +  Socket.IO ────────┤
-                                          └──────────────────┬───────────────┘
-                                                              │ machine:telemetry
-                                                              │ machine:connectivity
-                                                              ▼
-                                          ┌──────────────────────────────────┐
-                                          │  frontend/ (React dashboard)     │
-                                          └──────────────────────────────────┘
+caterpillar-machine-simulator                 CATman_central/backend
+┌──────────────────────────┐   machines/{id}/telemetry|heartbeat|state|events
+│ machine + control page   │ ─────────────────────────────────▶ mqtt.service
+│ (scenarios, pre-check    │   machines/{id}/precheck/ack|progress|result      │
+│  responder, horn, site)  │ ◀─────────────────────────────────  │ event bus
+└──────────────────────────┘   machines/{id}/commands/precheck|shift|horn     ▼
+                                site/conditions                  services ──▶ Firestore
+                                                                    │ Socket.IO
+                                                                    ▼
+                                                         frontend (dashboard)
 ```
 
-Communication between the two apps is **MQTT only**. `backend/` never imports
-simulator code. Data is in-memory only (no DB yet): restarting the backend
-clears telemetry history and connectivity state, but machine/task/operator
-seed data is static JSON.
+- **MQTT → event bus → services.** `mqtt.service` only parses topics and
+  emits on an in-process bus. The shift, pre-check, safety, alert, task and
+  idle-lesson services subscribe to that bus.
+- **Repository (`db/repo.js`).** Reads come from memory. Writes go to
+  memory and are persisted to Firestore in the background. On boot the
+  collections are preloaded from Firestore, with a 12 s timeout. If Firebase
+  isn't configured or can't be reached, everything still works in memory.
+- **Safety engine (`safety.engine.js`).** Deterministic rules over telemetry
+  plus site conditions. The stop zone scales with conditions:
+  3 m × rain 1.5 × low visibility 1.5 × night 1.3 × loaded 1.2 × fast 1.3.
+  The warning zone is twice the stop zone. The engine never reads the
+  simulator's `scenario` field; `npm run evaluate` checks detection against
+  it.
+- **Alerts** go ALERTED → ESCALATED (after 15 s with no ACK; the Control
+  Room is notified) → ACKNOWLEDGED → RESOLVED. CRITICAL alerts need a person
+  to acknowledge them; lower ones resolve on their own when the condition
+  clears. Each critical alert opens an incident with a black-box of
+  telemetry from 60 s before and 60 s after.
+- **Languages.** Alerts are sent as a code plus parameters
+  (`alert.title.PROXIMITY_CRITICAL`, `{distance, zone}`). Each screen
+  translates them, so every operator reads and hears them in their own
+  language.
 
-The ML anomaly detection model (`backend/src/ml/anomaly_ensemble.py`) is kept
-as-is and not wired into the live pipeline yet — that's a later phase.
+The ML model (`backend/src/ml/anomaly_ensemble.py`) is kept as-is and not
+wired into the live pipeline.
 
 ---
 
-## 2. Requirements
+## 2. Shift flow (what the operator sees)
 
-- Node.js v18+ (v20 recommended)
-- An MQTT broker reachable at `MQTT_URL` (both apps default to
-  `mqtt://localhost:1883`). If you don't have one running locally
-  (e.g. [Mosquitto](https://mosquitto.org/download/)), you can use the
-  bundled dev broker: `npm run broker` inside `backend/`.
-
----
-
-## 3. Repository Structure
-
-```
-CATman_central/
-├── backend/
-│   ├── src/
-│   │   ├── server.js                Express + Socket.IO entrypoint
-│   │   ├── config/env.js
-│   │   ├── data/                    operators.json, tasks.json, trainingModules.json
-│   │   ├── ml/anomaly_ensemble.py   ML model (not wired in yet)
-│   │   ├── controllers/
-│   │   ├── routes/
-│   │   ├── services/
-│   │   │   ├── mqtt.service.js          subscribes machines/+/telemetry
-│   │   │   ├── telemetryStore.service.js latest + rolling history per machine
-│   │   │   ├── connectivity.service.js   ONLINE / STALE / OFFLINE
-│   │   │   ├── machine.service.js        machine registry (Firestore or in-memory)
-│   │   │   ├── operator.service.js       stub "current operator" (no auth yet)
-│   │   │   ├── task.service.js
-│   │   │   ├── training.service.js       serves simulator modules from JSON
-│   │   │   ├── firebase.service.js       optional; falls back to in-memory
-│   │   │   └── anomalyDetection.service.js  placeholder for the ML integration
-│   │   ├── socket/socket.js
-│   │   └── scripts/
-│   │       ├── seed.js
-│   │       └── mqttBroker.js         optional local dev MQTT broker
-│   ├── .env / .env.example
-│   └── package.json
-└── frontend/
-    ├── src/
-    │   ├── api/            axios client + socket.io client
-    │   ├── hooks/          useFleet, useTasks, useOperator, useSiteConditions
-    │   ├── layout/         AppShell, Sidebar, TopBar
-    │   ├── pages/          Dashboard, ELearning, SimulationPlayer, ComingSoon (History/Profile)
-    │   ├── components/     MachineStatusCard, TaskCard, SiteConditionsCard, ...
-    │   ├── sim/            3D cab simulator (three.js via @react-three/fiber)
-    │   │   ├── SimSession.jsx      wires scene + scenario engine + HUD
-    │   │   ├── scenarioEngine.js   step/decision graph, scoring, violations, timeouts
-    │   │   ├── machineModel.js     machine state, joystick kinematics, temps, fuel
-    │   │   ├── monitorDisplay.js   draws the in-cab monitor onto a canvas texture
-    │   │   ├── scene/              Cab, Boom, World, Worker, Rain, Monitor, CameraGuide, ...
-    │   │   └── ui/                 SimHud, SimIntro, SimResults, TouchPad
-    │   └── utils/
-    └── package.json
-```
-
----
-
-## 4. Running it
-
-**1. MQTT broker** — skip this if you already have one (e.g. Mosquitto
-running as a service on `localhost:1883`):
-```bash
-cd backend
-npm run broker
-```
-
-**2. Backend**
-```bash
-cd backend
-npm install
-npm run dev        # or: npm start
-```
-Boots on `http://localhost:8000`, connects to `MQTT_URL`, and seeds
-`EXC001`/`EXC002`/`EXC003` into the machine registry if missing.
-
-**3. Frontend**
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Opens on `http://localhost:5173`.
-
-**4. Machine simulator** (separate app, publishes real MQTT telemetry)
-```bash
-cd ../../caterpillar-machine-simulator
-npm start
-curl -X POST http://localhost:3000/api/machine/start \
-  -H "Content-Type: application/json" \
-  -d '{"machineId":"EXC001"}'
-```
-The control server only runs one machine per process. To simulate more than
-one machine at once, run additional instances on different ports (see that
-app's README/config for `PORT`/`MQTT_BROKER_URL`).
-
-Once telemetry is flowing, the Dashboard's machine status card goes live and
-`GET /api/fleet` reflects real fuel/temperature/connectivity data.
-
----
-
-## 5. Environment Variables
-
-`backend/.env.example`:
-```env
-PORT=8000
-HOST=0.0.0.0
-CLIENT_URL=http://localhost:5173
-
-MQTT_URL=mqtt://localhost:1883
-HEARTBEAT_STALE_SEC=10
-HEARTBEAT_OFFLINE_SEC=20
-
-# Optional — falls back to an in-memory machine registry if unset
-FIREBASE_PROJECT_ID=
-FIREBASE_CLIENT_EMAIL=
-FIREBASE_PRIVATE_KEY=
-```
-
-`frontend/.env.example`:
-```env
-VITE_API_URL=http://localhost:8000/api
-VITE_SOCKET_URL=http://localhost:8000
-```
-
----
-
-## 6. REST API (implemented so far)
-
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/api/health` | |
-| GET | `/api/machines` | registry only, no live data |
-| GET | `/api/machines/:id` | registry + latest telemetry + connectivity |
-| GET | `/api/fleet` | all machines, same shape as above |
-| GET | `/api/tasks/today?operatorId=` | static seed data |
-| GET | `/api/operators/me` | stub — always returns the first seeded operator (no auth yet) |
-| GET | `/api/site/conditions` | static stub |
-| GET | `/api/training/modules` | module summaries (no scenario graph) |
-| GET | `/api/training/modules/:id` | full module incl. scenario nodes |
-
-## 7. Socket.IO events
-
-| Event | Payload |
+| State | Screen |
 |---|---|
-| `machine:telemetry` | raw telemetry payload from the simulator |
-| `machine:connectivity` | `{ machineId, status, lastSeenAt }` on status change |
+| NOT_STARTED | Machine card, today's tasks, **Run machine pre-check** |
+| PRECHECK_RUNNING | Sensors tick in live, with AUTO or MANUAL mode shown |
+| PRECHECK_FAILED | What failed, maintenance ticket number, spare machines, retry |
+| PRECHECK_PASSED | Warnings to acknowledge (if any), then the safety checklist |
+| CHECKLIST_COMPLETE | Next task and **Start task** |
+| TASK_ACTIVE / TASK_PAUSED | Progress ring, minutes left, delay risk ("Why?"), safety zone |
+| SHIFT_ENDED | Summary: fuel, idle time, alerts, safety score, XP, CO₂, cost |
 
-No rooms/auth yet — every connected client receives every machine's events.
+The safety checklist can't be ticked blindly:
+
+- **Seatbelt** is refused unless the machine's seatbelt sensor reads
+  fastened.
+- **Horn** is ticked only when the machine reports that the horn actually
+  sounded (**Test horn** sends an MQTT command and waits up to 10 s).
+
+### MANUAL pre-check (human in the loop)
+
+1. On the simulator control page, switch the pre-check panel to **MANUAL**.
+2. The operator presses **Run machine pre-check** on the dashboard.
+3. On the simulator page, a person marks each of the 15 sensors OK, WARN or
+   FAIL (with an optional note). Each one appears on the operator's
+   dashboard as soon as it's marked. "Mark all OK" does all of them at once.
+4. **Submit** is enabled only once all 15 are marked. The dashboard then
+   shows the result, and the operator continues.
+
+In MANUAL mode, if a person overrides a sensor reading (for example, marks
+it FAIL when the reading was OK), that's recorded in the audit log. A
+critical sensor that is FAIL fails the pre-check and opens a maintenance
+ticket.
+
+---
+
+## 3. Repository structure
+
+```
+backend/src/
+├── server.js                  boot: repo → seed → services → MQTT → listen
+├── config/env.js
+├── db/                        firestore.js, repo.js (write-through), seed.js
+├── data/                      operators.json, tasks.json, trainingModules.json
+├── routes/                    one router per area (see §5)
+├── services/
+│   ├── bus.js                 in-process event bus
+│   ├── mqtt.service.js        topics → bus; publishCommand()
+│   ├── precheck.service.js    request/ack/progress/result, evaluation
+│   ├── shift.service.js       state machine, checklist, horn test, summary
+│   ├── task.service.js        today's tasks, live progress + ETA
+│   ├── safety.engine.js       rules + dynamic safety envelope
+│   ├── alert.service.js       dedupe, lifecycle, escalation
+│   ├── incident.service.js    incidents, SOS, maintenance tickets, black-box
+│   ├── training.service.js    modules, progress, XP, recommendations, badges
+│   ├── idleLesson.service.js  suggests a lesson after long idling
+│   ├── assistant.service.js   Gemini function calling + offline fallback
+│   ├── operator / machine / site / audit / connectivity / telemetryStore
+├── socket/socket.js
+├── ml/anomaly_ensemble.py     not wired in
+└── scripts/                   seed.js, evaluateDetection.js, mqttBroker.js
+
+frontend/src/
+├── context/LiveContext.jsx    all live state + actions (socket + REST)
+├── i18n/                      en.js, hi.js, ta.js, translate()
+├── api/client.js              axios; ?operator= switch
+├── layout/                    AppShell, TopBar (language, SOS, bell, XP), Sidebar
+├── pages/                     Dashboard, ELearning, TaskHistory, Profile, ControlRoom, SimulationPlayer
+├── components/
+│   ├── dashboard/             PrecheckPanel, SafetyChecklist, ActiveTaskPanel, EnvelopeIndicator, ShiftSummary, ...
+│   ├── alerts/                AlertBanner, AlertCenter, AlertItem, IncidentReplay
+│   └── sos/                   SosButton, SosStatus
+├── assistant/                 AssistantPanel, useAssistantNavigation
+├── sim/                       3D cab simulator (three.js)
+└── utils/                     alarm (sound, vibrate, speech), format
+```
+
+---
+
+## 4. Environment variables
+
+`backend/.env` (copy from `.env.example`; **never commit keys**):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT`, `HOST`, `CLIENT_URL` | 8000, 0.0.0.0, :5173 | Server; any `localhost` port is also allowed by CORS |
+| `MQTT_URL` | mqtt://localhost:1883 | Same broker as the simulator |
+| `HEARTBEAT_STALE_SEC` / `HEARTBEAT_OFFLINE_SEC` | 10 / 20 | Connectivity status |
+| `PRECHECK_TIMEOUT_MS` | 5000 | Wait for the machine to acknowledge a pre-check |
+| `PRECHECK_AUTO_RESULT_TIMEOUT_MS` | 15000 | AUTO result deadline |
+| `PRECHECK_MANUAL_TIMEOUT_MS` | 600000 | MANUAL result deadline |
+| `HORN_TEST_WINDOW_MS` | 10000 | Horn test window |
+| `ALERT_ESCALATION_MS` | 15000 | Unacknowledged critical → Control Room |
+| `BLACK_BOX_WINDOW_MS` | 60000 | Before/after window for incidents |
+| `IDLE_LESSON_AFTER_SEC` | 180 | Suggest a lesson after this much idling |
+| `FUEL_PRICE_INR` | 95 | Shift cost in the summary |
+| `FIREBASE_API_KEY` … `FIREBASE_APP_ID` | empty | Firebase web config; empty = in-memory only |
+| `GEMINI_API_KEY` | empty | Empty = offline keyword assistant |
+| `GEMINI_MODELS` | 3.6-flash, 3.5-flash, 3.1-flash-lite | Tried in order |
+
+`frontend/.env`: `VITE_API_URL=http://localhost:8000/api`,
+`VITE_SOCKET_URL=http://localhost:8000`.
+
+**Firestore.** The app uses the Firebase *client* SDK with the web config,
+so the database must allow reads and writes (test mode or equivalent
+rules). Collections: `machines`, `operators`, `tasks`, `shifts`, `alerts`,
+`incidents`, `trainingProgress`, `auditLog`. `npm run seed` writes machines
+and operators; `npm run seed -- --force` overwrites them. `GET /api/health`
+shows whether storage is `firestore` or `memory`.
+
+---
+
+## 5. REST API
+
+Every endpoint that acts for an operator takes `operatorId` (query or body).
+The default is OP1001.
+
+| Area | Endpoints |
+|---|---|
+| Health | `GET /api/health` (MQTT, storage, assistant mode) |
+| Machines | `GET /api/machines`, `GET /api/machines/:id`, `GET /api/fleet` |
+| Operator | `GET /api/operators`, `GET/PATCH /api/operators/me` (language), `GET /api/operators/me/profile` |
+| Shift | `GET /api/shift/current`; `POST /api/shift/precheck`, `/precheck/cancel`, `/precheck/ack-warnings`, `/switch-machine` |
+| Checklist | `POST /api/shift/checklist/item`, `/checklist/horn`, `/checklist/complete` |
+| Task in shift | `POST /api/shift/task/start`, `/task/pause`, `/task/resume`, `/task/complete`; `POST /api/shift/end`, `/api/shift/new` |
+| Tasks | `GET /api/tasks/today`, `GET /api/tasks/history` |
+| Alerts | `GET /api/alerts`, `POST /api/alerts/:id/ack`, `/:id/resolve` |
+| Incidents | `GET /api/incidents`, `GET /api/incidents/:id` (with black-box), `POST /api/incidents/sos`, `/:id/ack`, `/:id/resolve`, `/:id/cancel` |
+| Training | `GET /api/training/modules`, `/modules/:id`, `POST /modules/:id/complete`, `GET /progress`, `GET /recommended` |
+| Assistant | `POST /api/assistant/chat` `{message, history, language}` → `{reply, actions}` |
+| Site | `GET /api/site/conditions` (includes the current safety envelope) |
+| Audit | `GET /api/audit` |
+
+## 6. Socket.IO events
+
+Every client receives every event (there are no rooms yet). Each screen
+filters by its own machine and operator.
+
+`machine:telemetry`, `machine:connectivity`, `heartbeat`, `site:conditions`,
+`shift:updated`, `precheck:progress`, `precheck:result`, `task:updated`,
+`alert:new`, `alert:updated`, `safety:envelope`, `supervisor:escalation`,
+`incident:new`, `incident:updated`, `sos:new`, `operator:updated`,
+`xp:awarded`, `training:idle_prompt`, `training:idle_prompt_cancel`.
+
+## 7. Assistant
+
+Open it with **Assistant** in the top bar. It answers in the selected
+language, using live data through these tools: machine status, active
+alerts, today's tasks, shift state, pre-check result, idle stats,
+incidents, training modules, recommendations, shift summary, profile and
+site conditions.
+
+When the answer points to a screen, it adds **Open** buttons and jumps to
+that screen, e.g. "take me to seatbelt training" or "show my alerts".
+Without a Gemini key, or if every model fails, a keyword fallback still
+answers the common questions and navigates.
 
 ---
 
@@ -270,16 +316,41 @@ WORKER_LEAVE | WORKER_IDLE_FAR | TEMP_RISE | TEMP_COOL`. Action names and hint
 targets are listed in `frontend/src/sim/scenarioEngine.js` and
 `frontend/src/sim/scene/CameraGuide.jsx`.
 
-Current limits: XP and completions are shown but **not saved** yet (no
-training progress backend). The cab and machine are built from simple shapes,
+Completing a module saves the score to `trainingProgress` and awards XP only when you beat your previous best. The E-Learning page shows recommended modules (based on your recent alerts) and your progress. Current limits:
+The cab and machine are built from simple shapes,
 not a CAD model.
 
 ---
 
-## 9. What's not built yet
+## 9. Demo script
 
-Everything else in `../IMPLEMENTATION_PLAN.md`: pre-check flow, shift state
-machine, safety engine, behaviour/anomaly engine wiring, ETA service,
-training progress/XP persistence, video/quiz and instructor modules,
-recommendations, AI assistant, and the Task History/Profile pages
-(currently placeholder screens in the sidebar).
+1. **Start the simulator** machine EXC001 and open the dashboard.
+2. **Pre-check:** press **Run machine pre-check** and watch the sensors
+   tick in.
+3. **MANUAL pre-check:** switch the simulator panel to MANUAL and run it
+   again. Mark BRAKES as FAIL and press Submit. The dashboard shows the
+   maintenance ticket and a spare machine.
+4. **Checklist:** start the simulator scenario `SEATBELT_VIOLATION` and try
+   to tick the seatbelt. It's refused. Stop the scenario, then tick
+   everything and press **Test horn**.
+5. **Start task**, then start the scenario `WORKER_NEARBY`. The red banner,
+   alarm and spoken warning appear. Switch the language to हिंदी and the
+   banner changes language. If nobody acknowledges within 15 s, the alert
+   escalates to the Control Room.
+6. **SOS:** hold SOS for 2 s. In **Control Room**, press **Acknowledge**
+   and the operator sees "Supervisor is on the way". Open **Replay** for
+   the black-box.
+7. **Assistant:** ask "What should I do now?" or "Take me to seatbelt
+   training".
+8. **End shift** to see the summary, XP, and the updated profile and
+   history.
+
+Detection check against the simulator's labelled scenarios:
+`npm run evaluate` (in `backend/`) prints precision and recall per rule.
+
+## 10. Not built yet
+
+- Login and roles; the operator is picked with `?operator=`.
+- Socket rooms per machine.
+- Wiring the ML anomaly model into the live pipeline.
+- Video/quiz and instructor-led training modules.

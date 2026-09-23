@@ -5,9 +5,10 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "dev": "nodemon --ignore src/data/ src/server.js",
     "broker": "node src/scripts/mqttBroker.js",
-    "seed": "node src/scripts/seed.js"
+    "seed": "node src/scripts/seed.js",
+    "evaluate": "node src/scripts/evaluateDetection.js"
   },
   "keywords": [
     "caterpillar",
@@ -17,7 +18,8 @@
     "mqtt",
     "iot",
     "socketio",
-    "firestore"
+    "firestore",
+    "gemini"
   ],
   "author": "",
   "license": "ISC",
@@ -25,7 +27,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "firebase-admin": "^13.1.0",
+    "firebase": "^11.10.0",
     "mqtt": "^5.14.1",
     "socket.io": "^4.8.1"
   },
