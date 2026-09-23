@@ -1,321 +1,190 @@
-# CAT Smart Operator - Machine Simulator & Backend (Repository 1)
+# CAT Smart Operator — CATman_central
 
-This repository serves as **Repository 1** for the **CAT Smart Operator** system: a real-time telemetry ingestion backend and multi-machine simulator designed for construction equipment (Caterpillar excavators).
+The operator-side application: a `backend/` (Express + Socket.IO + MQTT) and a
+`frontend/` (React + Vite + Tailwind) dashboard. This is a sibling app to
+`../caterpillar-machine-simulator`, which is the machine side.
 
----
-
-## 1. What This Repository Does
-
-- **Simulates Machines**: A lightweight simulation running two CAT machines (`EXC001` and `EXC002`) generating live operational metrics (engine hours, fuel used, load cycles, idle time, seatbelt status).
-- **Central Telemetry API**: Exposes Express REST APIs to ingest machine telemetry, validate incoming metrics, and verify machine registration.
-- **Persistent Storage**: Stores machines and time-series telemetry records in **Firebase Firestore** using the Firebase Admin SDK.
-- **Real-Time Broadcasting**: Emits live telemetry events over **Socket.IO** (`machine:telemetry`) so connected clients (such as the Operator Application in Repository 2) receive instantaneous updates.
+Only the Dashboard (NOT_STARTED view) is implemented so far — see
+`../IMPLEMENTATION_PLAN.md` for the full roadmap and UI guide.
 
 ---
 
-## 2. Architecture
+## 1. Architecture
 
 ```
-                    MACHINE REPOSITORY (Repository 1)
-
-       ┌────────────────────────────────────────────────────────┐
-       │               Machine Simulator                        │
-       │                                                        │
-       │     EXC001                           EXC002            │
-       │        │                               │               │
-       └────────┼───────────────────────────────┼───────────────┘
-                │                               │
-                │ HTTP POST /api/telemetry      │ HTTP POST /api/telemetry
-                ▼                               ▼
-       ┌────────────────────────────────────────────────────────┐
-       │                Node.js Express Backend                 │
-       │                                                        │
-       │   Routes -> Validation -> Persistence -> Socket.IO     │
-       └────────────────────────┬───────────────────────────────┘
-                                │
-                      ┌─────────┴─────────┐
-                      │                   │
-                      ▼                   ▼
-                 Firebase              Socket.IO
-                 Firestore             Server
-                                          │
-                                          │ event: "machine:telemetry"
-                                          ▼
-                                   Operator App
-                                  (Repository 2)
+caterpillar-machine-simulator            CATman_central
+┌───────────────────────┐                ┌──────────────────────────────────┐
+│  Machine (EXC001...)   │  MQTT          │  backend/                        │
+│  publishes telemetry   │─ ─ ─ ─ ─ ─ ─ ▶ │   mqtt.service       (subscribe) │
+│  to machines/{id}/     │  QoS 0         │   telemetryStore     (latest +   │
+│  telemetry             │                │                       history)  │
+└───────────────────────┘                │   connectivity.service (ONLINE/  │
+                                          │                     STALE/OFFLINE)│
+                                          │   REST API  +  Socket.IO ────────┤
+                                          └──────────────────┬───────────────┘
+                                                              │ machine:telemetry
+                                                              │ machine:connectivity
+                                                              ▼
+                                          ┌──────────────────────────────────┐
+                                          │  frontend/ (React dashboard)     │
+                                          └──────────────────────────────────┘
 ```
 
-> **Key Rule**: The machine simulator does NOT write directly to Firebase. The future React Operator App does NOT write directly to Firestore. The Node.js backend is the central authority.
+Communication between the two apps is **MQTT only**. `backend/` never imports
+simulator code. Data is in-memory only (no DB yet): restarting the backend
+clears telemetry history and connectivity state, but machine/task/operator
+seed data is static JSON.
+
+The ML anomaly detection model (`backend/src/ml/anomaly_ensemble.py`) is kept
+as-is and not wired into the live pipeline yet — that's a later phase.
 
 ---
 
-## 3. Requirements
+## 2. Requirements
 
-- **Node.js**: v18.0.0 or higher (v20+ recommended)
-- **npm**: v9.0.0 or higher
-- **Firebase Project**: A Google Cloud / Firebase account with Firestore Database enabled.
+- Node.js v18+ (v20 recommended)
+- An MQTT broker reachable at `MQTT_URL` (both apps default to
+  `mqtt://localhost:1883`). If you don't have one running locally
+  (e.g. [Mosquitto](https://mosquitto.org/download/)), you can use the
+  bundled dev broker: `npm run broker` inside `backend/`.
 
 ---
 
-## 4. Repository Structure
+## 3. Repository Structure
 
 ```
-cat-machine-backend/
-├── src/
-│   ├── server.js                      # Express HTTP & Socket.IO server entrypoint
-│   ├── simulator/
-│   │   └── machineSimulator.js        # Simulates EXC001 & EXC002 telemetry
-│   ├── routes/
-│   │   ├── health.routes.js           # GET /api/health
-│   │   ├── machine.routes.js          # GET /api/machines & /api/machines/:machineId
-│   │   └── telemetry.routes.js        # POST /api/telemetry
-│   ├── controllers/
-│   │   ├── machine.controller.js      # Machine request handlers
-│   │   └── telemetry.controller.js    # Telemetry validation & broadcast handler
-│   ├── services/
-│   │   ├── firebase.service.js        # Firebase Admin SDK & Firestore connection
-│   │   ├── machine.service.js         # Machine querying & seeding logic
-│   │   └── telemetry.service.js       # Telemetry Firestore persistence
-│   ├── socket/
-│   │   └── socket.js                  # Socket.IO lifecycle & broadcasting
-│   ├── scripts/
-│   │   └── seed.js                    # Seeding CLI for initial machines
-│   └── config/
-│       └── env.js                     # Environment variables configuration
-├── .env.example                       # Template for environment configuration
-├── .env                               # Local environment file (gitignored)
-├── .gitignore                         # Git exclusion rules
-├── package.json                       # Dependencies & scripts
-└── README.md                          # Documentation
+CATman_central/
+├── backend/
+│   ├── src/
+│   │   ├── server.js                Express + Socket.IO entrypoint
+│   │   ├── config/env.js
+│   │   ├── data/                    operators.json, tasks.json (seed data)
+│   │   ├── ml/anomaly_ensemble.py   ML model (not wired in yet)
+│   │   ├── controllers/
+│   │   ├── routes/
+│   │   ├── services/
+│   │   │   ├── mqtt.service.js          subscribes machines/+/telemetry
+│   │   │   ├── telemetryStore.service.js latest + rolling history per machine
+│   │   │   ├── connectivity.service.js   ONLINE / STALE / OFFLINE
+│   │   │   ├── machine.service.js        machine registry (Firestore or in-memory)
+│   │   │   ├── operator.service.js       stub "current operator" (no auth yet)
+│   │   │   ├── task.service.js
+│   │   │   ├── firebase.service.js       optional; falls back to in-memory
+│   │   │   └── anomalyDetection.service.js  placeholder for the ML integration
+│   │   ├── socket/socket.js
+│   │   └── scripts/
+│   │       ├── seed.js
+│   │       └── mqttBroker.js         optional local dev MQTT broker
+│   ├── .env / .env.example
+│   └── package.json
+└── frontend/
+    ├── src/
+    │   ├── api/            axios client + socket.io client
+    │   ├── hooks/          useFleet, useTasks, useOperator, useSiteConditions
+    │   ├── layout/         AppShell, Sidebar, TopBar
+    │   ├── pages/          Dashboard, ComingSoon (E-Learning/History/Profile stubs)
+    │   ├── components/     MachineStatusCard, TaskCard, SiteConditionsCard, ...
+    │   └── utils/
+    └── package.json
 ```
 
 ---
 
-## 5. Firebase & Firestore Setup
+## 4. Running it
 
-### Step A: Create Firebase Project
-1. Visit the [Firebase Console](https://console.firebase.google.com/).
-2. Click **Add project** and name it (e.g. `cat-smart-operator`).
-3. Under **Build**, select **Firestore Database** and click **Create database**.
-4. Choose your preferred region and start in **Production mode** (or Test mode).
-
-### Step B: Generate Service Account Key
-1. Go to **Project Settings** (gear icon) -> **Service accounts**.
-2. Select **Firebase Admin SDK** (Node.js).
-3. Click **Generate new private key** and download the JSON file.
-
-### Step C: Extract Credentials for `.env`
-Open the downloaded JSON file and copy the values:
-- `project_id` -> `FIREBASE_PROJECT_ID`
-- `client_email` -> `FIREBASE_CLIENT_EMAIL`
-- `private_key` -> `FIREBASE_PRIVATE_KEY` (keep quotes around it if it spans multiple lines, or leave standard `\n` characters).
-
-> **Never commit your service account JSON or private key to Git.**
-
----
-
-## 6. Environment Variables
-
-Copy `.env.example` to `.env`:
-
+**1. MQTT broker** — skip this if you already have one (e.g. Mosquitto
+running as a service on `localhost:1883`):
 ```bash
-cp .env.example .env
+cd backend
+npm run broker
 ```
 
-Configure the variables inside `.env`:
+**2. Backend**
+```bash
+cd backend
+npm install
+npm run dev        # or: npm start
+```
+Boots on `http://localhost:8000`, connects to `MQTT_URL`, and seeds
+`EXC001`/`EXC002`/`EXC003` into the machine registry if missing.
 
+**3. Frontend**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Opens on `http://localhost:5173`.
+
+**4. Machine simulator** (separate app, publishes real MQTT telemetry)
+```bash
+cd ../../caterpillar-machine-simulator
+npm start
+curl -X POST http://localhost:3000/api/machine/start \
+  -H "Content-Type: application/json" \
+  -d '{"machineId":"EXC001"}'
+```
+The control server only runs one machine per process. To simulate more than
+one machine at once, run additional instances on different ports (see that
+app's README/config for `PORT`/`MQTT_BROKER_URL`).
+
+Once telemetry is flowing, the Dashboard's machine status card goes live and
+`GET /api/fleet` reflects real fuel/temperature/connectivity data.
+
+---
+
+## 5. Environment Variables
+
+`backend/.env.example`:
 ```env
-# Server
 PORT=8000
 HOST=0.0.0.0
 CLIENT_URL=http://localhost:5173
 
-# Simulator
-API_BASE_URL=http://localhost:8000
-SIMULATOR_INTERVAL_MS=4000
+MQTT_URL=mqtt://localhost:1883
+HEARTBEAT_STALE_SEC=10
+HEARTBEAT_OFFLINE_SEC=20
 
-# Firebase Firestore (from Service Account Key)
-FIREBASE_PROJECT_ID=your-firebase-project-id
-FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxx@your-project.iam.gserviceaccount.com
-FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkq...YOUR_KEY...\n-----END PRIVATE KEY-----\n"
+# Optional — falls back to an in-memory machine registry if unset
+FIREBASE_PROJECT_ID=
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_PRIVATE_KEY=
 ```
 
-> **Note**: If Firebase credentials are not yet added, the backend will still boot and provide `/api/health` and an in-memory fallback store for offline testing.
-
----
-
-## 7. Installing Dependencies
-
-Inside the project directory:
-
-```bash
-npm install
+`frontend/.env.example`:
+```env
+VITE_API_URL=http://localhost:8000/api
+VITE_SOCKET_URL=http://localhost:8000
 ```
 
 ---
 
-## 8. Initializing Machines in Firestore
+## 6. REST API (implemented so far)
 
-To ensure machines `EXC001` and `EXC002` exist in Firestore, run:
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/health` | |
+| GET | `/api/machines` | registry only, no live data |
+| GET | `/api/machines/:id` | registry + latest telemetry + connectivity |
+| GET | `/api/fleet` | all machines, same shape as above |
+| GET | `/api/tasks/today?operatorId=` | static seed data |
+| GET | `/api/operators/me` | stub — always returns the first seeded operator (no auth yet) |
+| GET | `/api/site/conditions` | static stub |
 
-```bash
-npm run seed
-```
+## 7. Socket.IO events
 
-This checks Firestore `machines` collection. If the machines do not already exist, it creates documents `machines/EXC001` and `machines/EXC002`. Existing documents are never duplicated.
+| Event | Payload |
+|---|---|
+| `machine:telemetry` | raw telemetry payload from the simulator |
+| `machine:connectivity` | `{ machineId, status, lastSeenAt }` on status change |
 
----
-
-## 9. Running the Backend
-
-### Development Mode (with hot-reload via nodemon):
-```bash
-npm run dev
-```
-
-### Production Mode:
-```bash
-npm start
-```
-
-The server binds to `0.0.0.0:8000`, making it accessible on `http://localhost:8000` or across the local network using `http://<YOUR_LOCAL_IP>:8000`.
+No rooms/auth yet — every connected client receives every machine's events.
 
 ---
 
-## 10. Running the Machine Simulator
+## 8. What's not built yet
 
-In a separate terminal:
-
-```bash
-npm run simulator
-```
-
-The simulator will start emitting telemetry for `EXC001` and `EXC002` every 4 seconds to `POST http://localhost:8000/api/telemetry`.
-
----
-
-## 11. API Reference & Testing
-
-### 1. Health Check
-```bash
-curl http://localhost:8000/api/health
-```
-**Response (200 OK):**
-```json
-{
-  "status": "ok",
-  "service": "cat-machine-backend"
-}
-```
-
-### 2. Get All Machines
-```bash
-curl http://localhost:8000/api/machines
-```
-**Response (200 OK):**
-```json
-{
-  "count": 2,
-  "machines": [
-    {
-      "id": "EXC001",
-      "machineId": "EXC001",
-      "name": "Excavator 001",
-      "type": "Hydraulic Excavator"
-    },
-    {
-      "id": "EXC002",
-      "machineId": "EXC002",
-      "name": "Excavator 002",
-      "type": "Hydraulic Excavator"
-    }
-  ]
-}
-```
-
-### 3. Get Single Machine
-```bash
-curl http://localhost:8000/api/machines/EXC001
-```
-
-### 4. Send Telemetry
-```bash
-curl -X POST http://localhost:8000/api/telemetry \
-  -H "Content-Type: application/json" \
-  -d '{
-    "machineId": "EXC001",
-    "engineHours": 1526.5,
-    "fuelUsed": 6.1,
-    "loadCycles": 10,
-    "idleTime": 15,
-    "seatbeltStatus": true
-  }'
-```
-**Response (201 Created):**
-```json
-{
-  "id": "docIdOrGeneratedId",
-  "machineId": "EXC001",
-  "engineHours": 1526.5,
-  "fuelUsed": 6.1,
-  "loadCycles": 10,
-  "idleTime": 15,
-  "seatbeltStatus": true,
-  "timestamp": "2026-09-23T10:15:00.000Z"
-}
-```
-
----
-
-## 12. Socket.IO & Operator Application Connection
-
-The backend integrates Socket.IO on the same HTTP server (`http://localhost:8000`).
-
-### Event: `machine:telemetry`
-Every time `POST /api/telemetry` is received by the backend, it emits `machine:telemetry` with the newly saved telemetry object.
-
-### Connecting from the React Operator App (Repository 2):
-In the frontend application:
-
-```javascript
-import { io } from "socket.io-client";
-
-const socket = io("http://localhost:8000", {
-  transports: ["websocket", "polling"],
-});
-
-socket.on("connect", () => {
-  console.log("Connected to CAT Machine Backend Socket.IO server!");
-});
-
-socket.on("machine:telemetry", (data) => {
-  console.log("Live Telemetry Received:", data);
-  // Example update:
-  // updateMachineCard(data.machineId, data);
-});
-
-socket.on("disconnect", () => {
-  console.log("Disconnected from server");
-});
-```
-
----
-
-## 13. Telemetry Verification Flow
-
-To verify the complete end-to-end pipeline:
-
-1. **Terminal 1**: Start the backend:
-   ```bash
-   npm run dev
-   ```
-2. **Terminal 2**: (Optional) Run the seeding script:
-   ```bash
-   npm run seed
-   ```
-3. **Terminal 3**: Launch the machine simulator:
-   ```bash
-   npm run simulator
-   ```
-4. Observe the simulator logging outgoing telemetry requests and HTTP 201 responses.
-5. In Terminal 1, observe the backend receiving the telemetry, persisting it, and emitting `machine:telemetry`.
+Everything else in `../IMPLEMENTATION_PLAN.md`: pre-check flow, shift state
+machine, safety engine, behaviour/anomaly engine wiring, ETA service,
+training hub, AI assistant, and the E-Learning/Task History/Profile pages
+(currently placeholder screens in the sidebar).
