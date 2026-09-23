@@ -9,6 +9,35 @@ Only the Dashboard (NOT_STARTED view) is implemented so far — see
 
 ---
 
+## Quick Start (backend + frontend)
+
+You need an MQTT broker running at `mqtt://localhost:1883` for live machine
+data (e.g. [Mosquitto](https://mosquitto.org/download/) installed as a
+service, or `npm run broker` inside `backend/` for a throwaway dev broker).
+Without one, the backend still runs fine — the dashboard just shows every
+machine as OFFLINE until telemetry arrives.
+
+**Terminal 1 — backend** (`http://localhost:8000`):
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+**Terminal 2 — frontend** (`http://localhost:5173`):
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173` in a browser. To see live machine data instead
+of OFFLINE placeholders, also start the machine simulator — see section 4
+below ("Running it") for the full multi-process setup including MQTT and the
+simulator.
+
+---
+
 ## 1. Architecture
 
 ```
