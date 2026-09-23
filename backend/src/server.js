@@ -12,6 +12,7 @@ const fleetRoutes = require('./routes/fleet.routes');
 const taskRoutes = require('./routes/task.routes');
 const operatorRoutes = require('./routes/operator.routes');
 const siteRoutes = require('./routes/site.routes');
+const trainingRoutes = require('./routes/training.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -35,6 +36,7 @@ app.use('/api/fleet', fleetRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/operators', operatorRoutes);
 app.use('/api/site', siteRoutes);
+app.use('/api/training', trainingRoutes);
 
 // 404 Handler for undefined routes
 app.use((req, res) => {

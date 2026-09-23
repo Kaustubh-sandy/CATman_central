@@ -1,0 +1,277 @@
+[
+  {
+    "id": "SIM_STARTUP",
+    "title": "Safe start-up",
+    "type": "SIMULATION",
+    "skill": "PRECHECK_PROCEDURE",
+    "difficulty": "EASY",
+    "durationMin": 3,
+    "xp": 50,
+    "summary": "Belt, checks, horn, clear area — then hydraulics. In that order.",
+    "objectives": [
+      "Fasten the seatbelt before the engine",
+      "Check the monitor for warnings",
+      "Sound the horn and check all around before moving",
+      "Unlock hydraulics only when the area is clear"
+    ],
+    "environment": { "weather": "CLEAR", "visibility": "GOOD", "ambientTempC": 30, "showSwingRadius": true },
+    "initialState": {
+      "engineOn": false, "seatbelt": false, "locked": true, "throttleHigh": false,
+      "boom": 0.45, "arm": -1.9, "bucket": -0.9
+    },
+    "initialScene": { "workerMode": "IDLE_FAR" },
+    "start": "belt",
+    "nodes": {
+      "belt": {
+        "kind": "ACTION", "prompt": "Fasten seatbelt", "detail": "Orange belt, left of the seat",
+        "expect": ["SEATBELT_ON"], "hintTarget": "seatbelt", "score": 10, "next": "monitor"
+      },
+      "monitor": {
+        "kind": "ACTION", "prompt": "Check the monitor", "detail": "Tap the display — fuel and warnings",
+        "expect": ["CHECK_DISPLAY"], "hintTarget": "monitor", "score": 5, "next": "engine"
+      },
+      "engine": {
+        "kind": "ACTION", "prompt": "Start the engine", "detail": "Turn the key on the right console",
+        "expect": ["ENGINE_START"], "hintTarget": "key", "score": 10, "next": "horn"
+      },
+      "horn": {
+        "kind": "ACTION", "prompt": "Sound the horn", "detail": "Warn people before you move",
+        "expect": ["HORN"], "hintTarget": "horn", "score": 10, "next": "area"
+      },
+      "area": {
+        "kind": "DECISION", "prompt": "Is the swing area clear?", "detail": "Drag to look all around — including behind you",
+        "choices": [
+          { "text": "Yes — nobody inside the yellow ring", "next": "unlock", "score": 10,
+            "feedback": "Correct. The worker behind you is about 15 m away, outside the swing area." },
+          { "text": "No — someone is inside it", "next": "unlock", "score": -5,
+            "feedback": "Look again: the worker is outside the yellow ring. Check before you decide." },
+          { "text": "Start anyway, I'll watch while moving", "next": "unlock", "score": -10,
+            "feedback": "Never move before checking. Most swing accidents start this way." }
+        ]
+      },
+      "unlock": {
+        "kind": "ACTION", "prompt": "Unlock hydraulics", "detail": "Lower the lockout lever on your left",
+        "expect": ["UNLOCK_HYDRAULICS"], "hintTarget": "lockout", "score": 10, "next": "boom"
+      },
+      "boom": {
+        "kind": "ACTION", "prompt": "Raise the boom", "detail": "Right stick back — ↓ key",
+        "expect": ["BOOM_UP"], "hintTarget": "rightStick", "score": 10, "next": "swing"
+      },
+      "swing": {
+        "kind": "ACTION", "prompt": "Swing right", "detail": "Left stick right — D key",
+        "expect": ["SWING_RIGHT"], "hintTarget": "leftStick", "score": 10, "next": "done"
+      },
+      "done": {
+        "kind": "END", "outcome": "PASS",
+        "feedback": "Machine started safely: belt, checks, horn, clear area, then hydraulics."
+      }
+    }
+  },
+  {
+    "id": "SIM_PROXIMITY_RAIN",
+    "title": "Worker in swing radius — rain",
+    "type": "SIMULATION",
+    "skill": "PROXIMITY_AWARENESS",
+    "difficulty": "MEDIUM",
+    "durationMin": 3,
+    "xp": 80,
+    "summary": "Low visibility. A worker walks into your swing area. You have seconds.",
+    "objectives": [
+      "Stop all movement the moment a person enters the swing area",
+      "Signal with the horn",
+      "Lock hydraulics while someone is near",
+      "Warn again before moving"
+    ],
+    "environment": { "weather": "RAIN", "visibility": "LOW", "ambientTempC": 24, "showSwingRadius": true },
+    "initialState": {
+      "engineOn": true, "seatbelt": true, "locked": false, "throttleHigh": true, "rpm": 1850,
+      "boom": 0.75, "arm": -1.5, "bucket": -0.8, "engineTemp": 86, "hydTemp": 66
+    },
+    "start": "load",
+    "nodes": {
+      "load": {
+        "kind": "ACTION", "prompt": "Swing left to the truck", "detail": "Left stick left — A key",
+        "expect": ["SWING_LEFT"], "hintTarget": "leftStick", "score": 5, "next": "hazard"
+      },
+      "hazard": {
+        "kind": "DECISION", "alert": true, "sceneEvent": "WORKER_APPROACH",
+        "prompt": "STOP — Person entering swing area", "detail": "Rain. Low visibility. Decide now.",
+        "timeoutSec": 8, "graceSec": 2, "timeoutNext": "hit", "timeoutScore": -15,
+        "timeoutFeedback": "You kept working. The worker walked into your swing radius.",
+        "choices": [
+          { "text": "Stop all movement and sound horn", "actions": ["HORN"], "next": "wait", "score": 15,
+            "feedback": "Correct — stop, signal, make eye contact." },
+          { "text": "Keep swinging slowly", "next": "hit", "score": -10,
+            "feedback": "Unsafe. In rain, safe distance is 1.5× normal — stop at first sight." },
+          { "text": "Swing away quickly", "next": "hit", "score": -10,
+            "feedback": "Sudden moves in poor visibility put people at risk." },
+          { "text": "Kept moving the machine", "hidden": true,
+            "actions": ["SWING_LEFT", "SWING_RIGHT", "BOOM_UP", "BOOM_DOWN", "ARM_IN", "ARM_OUT"],
+            "next": "hit", "score": -15, "feedback": "You kept moving with a person inside the swing radius." }
+        ]
+      },
+      "wait": {
+        "kind": "DECISION", "sceneEvent": "WORKER_STOP_WAVE",
+        "prompt": "Worker stopped and waves. What now?", "detail": "They are still inside the ring",
+        "graceSec": 1,
+        "choices": [
+          { "text": "Lock hydraulics and wait until clear", "actions": ["LOCK_HYDRAULICS"], "next": "resume", "score": 10,
+            "feedback": "Right — lock out while anyone is inside the swing area." },
+          { "text": "Resume work — they have seen me", "next": "resume", "score": -5,
+            "feedback": "Being seen is not being clear. Wait until they are outside the ring." },
+          { "text": "Moved while worker was inside", "hidden": true,
+            "actions": ["SWING_LEFT", "SWING_RIGHT", "BOOM_UP", "BOOM_DOWN", "ARM_IN", "ARM_OUT"],
+            "next": "hit", "score": -15, "feedback": "You moved while the worker was still inside the swing radius." }
+        ]
+      },
+      "resume": {
+        "kind": "ACTION", "sceneEvent": "WORKER_LEAVE",
+        "prompt": "Worker is walking clear. Sound horn", "detail": "Always warn before moving again",
+        "expect": ["HORN"], "hintTarget": "horn", "score": 5, "next": "unlock"
+      },
+      "unlock": {
+        "kind": "ACTION", "prompt": "Unlock hydraulics", "detail": "Lower the lockout lever",
+        "expect": ["UNLOCK_HYDRAULICS"], "hintTarget": "lockout", "score": 5, "next": "done"
+      },
+      "hit": {
+        "kind": "END", "outcome": "FAIL",
+        "feedback": "Incident: worker inside the swing radius while the machine moved. Stop and signal at first sight — safe distance in rain is 1.5× normal."
+      },
+      "done": {
+        "kind": "END", "outcome": "PASS",
+        "feedback": "Stop, signal, lock out, wait until clear, warn before resuming."
+      }
+    }
+  },
+  {
+    "id": "SIM_OVERHEAT",
+    "title": "Engine overheating",
+    "type": "SIMULATION",
+    "skill": "MACHINE_CARE",
+    "difficulty": "MEDIUM",
+    "durationMin": 3,
+    "xp": 70,
+    "summary": "41 °C day. Engine temperature climbs while you dig.",
+    "objectives": [
+      "Spot the temperature warning on the monitor",
+      "Lower the bucket and idle down — no hot shutdown",
+      "Lock out while it cools",
+      "Report it before restarting work"
+    ],
+    "environment": { "weather": "CLEAR", "visibility": "GOOD", "ambientTempC": 41, "showSwingRadius": false },
+    "initialState": {
+      "engineOn": true, "seatbelt": true, "locked": false, "throttleHigh": true, "rpm": 1850,
+      "boom": 0.7, "arm": -1.7, "bucket": -0.7, "engineTemp": 88, "hydTemp": 70
+    },
+    "start": "dig",
+    "nodes": {
+      "dig": {
+        "kind": "ACTION", "prompt": "Keep digging: arm in", "detail": "Left stick back — S key",
+        "expect": ["ARM_IN"], "hintTarget": "leftStick", "score": 5, "next": "warn"
+      },
+      "warn": {
+        "kind": "DECISION", "alert": true, "sceneEvent": "TEMP_RISE",
+        "prompt": "Engine temperature rising", "detail": "Check the monitor",
+        "timeoutSec": 15, "graceSec": 2, "timeoutNext": "damage", "timeoutScore": -15,
+        "timeoutFeedback": "The engine kept running hot under full load.",
+        "choices": [
+          { "text": "Stop work and lower the bucket", "next": "lower", "score": 10,
+            "feedback": "Good — take the load off first." },
+          { "text": "Finish this load first", "next": "damage", "score": -10,
+            "feedback": "Running an overheating engine under load can wreck it in minutes." },
+          { "text": "Switch the engine off now", "actions": ["ENGINE_STOP"], "next": "report", "score": -5,
+            "feedback": "Hot shutdown at high load can damage the turbo. Idle it down first." }
+        ]
+      },
+      "lower": {
+        "kind": "ACTION", "prompt": "Lower bucket to the ground", "detail": "Right stick forward — ↑ key",
+        "expect": ["BUCKET_ON_GROUND"], "hintTarget": "rightStick", "score": 10, "next": "idle"
+      },
+      "idle": {
+        "kind": "ACTION", "prompt": "Throttle down to idle", "detail": "Turn the throttle dial on the right",
+        "expect": ["THROTTLE_LOW"], "hintTarget": "throttle", "score": 10, "next": "cool"
+      },
+      "cool": {
+        "kind": "ACTION", "sceneEvent": "TEMP_COOL", "prompt": "Lock hydraulics while it cools",
+        "detail": "Raise the lockout lever on your left",
+        "expect": ["LOCK_HYDRAULICS"], "hintTarget": "lockout", "score": 10, "next": "report"
+      },
+      "report": {
+        "kind": "DECISION", "sceneEvent": "TEMP_COOL", "prompt": "What next?", "detail": "Temperature is coming down",
+        "choices": [
+          { "text": "Report it before restarting work", "next": "done", "score": 10,
+            "feedback": "Correct. Overheating has a cause — coolant, blocked radiator, fan belt." },
+          { "text": "Carry on — it's fine now", "next": "done", "score": -5,
+            "feedback": "It will happen again. Report it so maintenance can find the cause." }
+        ]
+      },
+      "damage": {
+        "kind": "END", "outcome": "FAIL",
+        "feedback": "Engine overheated under load. Stop, lower the bucket, idle down, and let it cool."
+      },
+      "done": {
+        "kind": "END", "outcome": "PASS",
+        "feedback": "Load off, idle down, lock out, cool down, report."
+      }
+    }
+  },
+  {
+    "id": "SIM_SHUTDOWN",
+    "title": "End-of-shift shutdown",
+    "type": "SIMULATION",
+    "skill": "IDLE_REDUCTION",
+    "difficulty": "EASY",
+    "durationMin": 2,
+    "xp": 40,
+    "summary": "Park it right: bucket down, idle, lock out, engine off.",
+    "objectives": [
+      "Lower the bucket to the ground",
+      "Idle briefly — not too long",
+      "Lock hydraulics before the engine goes off",
+      "Engine off, then belt off"
+    ],
+    "environment": { "weather": "CLEAR", "visibility": "GOOD", "ambientTempC": 28, "showSwingRadius": false },
+    "initialState": {
+      "engineOn": true, "seatbelt": true, "locked": false, "throttleHigh": true, "rpm": 1850,
+      "boom": 0.7, "arm": -1.7, "bucket": -0.7, "engineTemp": 87, "hydTemp": 68
+    },
+    "start": "lower",
+    "nodes": {
+      "lower": {
+        "kind": "ACTION", "prompt": "Lower bucket to the ground", "detail": "Right stick forward — ↑ key",
+        "expect": ["BUCKET_ON_GROUND"], "hintTarget": "rightStick", "score": 10, "next": "idle"
+      },
+      "idle": {
+        "kind": "ACTION", "prompt": "Throttle down to idle", "detail": "Turn the throttle dial",
+        "expect": ["THROTTLE_LOW"], "hintTarget": "throttle", "score": 10, "next": "cooldown"
+      },
+      "cooldown": {
+        "kind": "DECISION", "prompt": "How long to idle before switching off?", "detail": "Think turbo and fuel",
+        "choices": [
+          { "text": "3–5 minutes", "next": "lock", "score": 10,
+            "feedback": "Right — enough to cool the turbo, not wasting fuel." },
+          { "text": "Switch off right away", "next": "lock", "score": -5,
+            "feedback": "A hot turbo needs a few minutes of idle to cool." },
+          { "text": "15 minutes or more, to be safe", "next": "lock", "score": -3,
+            "feedback": "Long idling burns about 4 L/h for nothing." }
+        ]
+      },
+      "lock": {
+        "kind": "ACTION", "prompt": "Lock hydraulics", "detail": "Raise the lockout lever",
+        "expect": ["LOCK_HYDRAULICS"], "hintTarget": "lockout", "score": 10, "next": "engine"
+      },
+      "engine": {
+        "kind": "ACTION", "prompt": "Turn off the engine", "detail": "Key on the right console",
+        "expect": ["ENGINE_STOP"], "hintTarget": "key", "score": 10, "next": "belt"
+      },
+      "belt": {
+        "kind": "ACTION", "prompt": "Unfasten seatbelt", "detail": "Last step before climbing down",
+        "expect": ["SEATBELT_OFF"], "hintTarget": "seatbelt", "score": 5, "next": "done"
+      },
+      "done": {
+        "kind": "END", "outcome": "PASS",
+        "feedback": "Parked safely. Use three points of contact when you climb down."
+      }
+    }
+  }
+]

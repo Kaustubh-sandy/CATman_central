@@ -4,7 +4,8 @@ The operator-side application: a `backend/` (Express + Socket.IO + MQTT) and a
 `frontend/` (React + Vite + Tailwind) dashboard. This is a sibling app to
 `../caterpillar-machine-simulator`, which is the machine side.
 
-Only the Dashboard (NOT_STARTED view) is implemented so far — see
+Implemented so far: the Dashboard (NOT_STARTED view) and the E-Learning page
+with a 3D excavator-cab training simulator (section 8). See
 `../IMPLEMENTATION_PLAN.md` for the full roadmap and UI guide.
 
 ---
@@ -87,7 +88,7 @@ CATman_central/
 │   ├── src/
 │   │   ├── server.js                Express + Socket.IO entrypoint
 │   │   ├── config/env.js
-│   │   ├── data/                    operators.json, tasks.json (seed data)
+│   │   ├── data/                    operators.json, tasks.json, trainingModules.json
 │   │   ├── ml/anomaly_ensemble.py   ML model (not wired in yet)
 │   │   ├── controllers/
 │   │   ├── routes/
@@ -98,6 +99,7 @@ CATman_central/
 │   │   │   ├── machine.service.js        machine registry (Firestore or in-memory)
 │   │   │   ├── operator.service.js       stub "current operator" (no auth yet)
 │   │   │   ├── task.service.js
+│   │   │   ├── training.service.js       serves simulator modules from JSON
 │   │   │   ├── firebase.service.js       optional; falls back to in-memory
 │   │   │   └── anomalyDetection.service.js  placeholder for the ML integration
 │   │   ├── socket/socket.js
@@ -111,8 +113,15 @@ CATman_central/
     │   ├── api/            axios client + socket.io client
     │   ├── hooks/          useFleet, useTasks, useOperator, useSiteConditions
     │   ├── layout/         AppShell, Sidebar, TopBar
-    │   ├── pages/          Dashboard, ComingSoon (E-Learning/History/Profile stubs)
+    │   ├── pages/          Dashboard, ELearning, SimulationPlayer, ComingSoon (History/Profile)
     │   ├── components/     MachineStatusCard, TaskCard, SiteConditionsCard, ...
+    │   ├── sim/            3D cab simulator (three.js via @react-three/fiber)
+    │   │   ├── SimSession.jsx      wires scene + scenario engine + HUD
+    │   │   ├── scenarioEngine.js   step/decision graph, scoring, violations, timeouts
+    │   │   ├── machineModel.js     machine state, joystick kinematics, temps, fuel
+    │   │   ├── monitorDisplay.js   draws the in-cab monitor onto a canvas texture
+    │   │   ├── scene/              Cab, Boom, World, Worker, Rain, Monitor, CameraGuide, ...
+    │   │   └── ui/                 SimHud, SimIntro, SimResults, TouchPad
     │   └── utils/
     └── package.json
 ```
@@ -199,6 +208,8 @@ VITE_SOCKET_URL=http://localhost:8000
 | GET | `/api/tasks/today?operatorId=` | static seed data |
 | GET | `/api/operators/me` | stub — always returns the first seeded operator (no auth yet) |
 | GET | `/api/site/conditions` | static stub |
+| GET | `/api/training/modules` | module summaries (no scenario graph) |
+| GET | `/api/training/modules/:id` | full module incl. scenario nodes |
 
 ## 7. Socket.IO events
 
@@ -211,9 +222,64 @@ No rooms/auth yet — every connected client receives every machine's events.
 
 ---
 
-## 8. What's not built yet
+## 8. E-Learning: 3D cab simulator
+
+Sidebar → **E-Learning** → pick a module → **Start**. You sit in the
+operator's seat of an excavator cab (seat, joysticks, lockout lever, key,
+throttle dial, seatbelt, live monitor) and look out at the boom, arm and
+bucket, a dump truck, and site workers.
+
+| Module | What it trains |
+|---|---|
+| Safe start-up | belt → monitor check → engine → horn → look around → unlock hydraulics → move |
+| Worker in swing radius — rain | low visibility; a worker walks into the swing area — stop, horn, lock out, wait, warn |
+| Engine overheating | temperature climbs on the monitor — lower bucket, idle down, lock out, report |
+| End-of-shift shutdown | bucket down, idle, lock out, engine off, belt off |
+
+**Controls**
+
+| | Mouse / touch | Keyboard |
+|---|---|---|
+| Look around | drag | — |
+| Use a control | tap it in the cab | B belt · E key · Q lockout · T throttle · H horn · M monitor |
+| Left joystick (arm / swing) | left on-screen pad | W A S D |
+| Right joystick (boom / bucket) | right on-screen pad | ↑ ↓ ← → or I J K L |
+
+Joysticks follow the ISO pattern: left stick forward/back = arm out/in,
+left/right = swing; right stick forward/back = boom down/up, left/right =
+bucket curl/dump.
+
+**What the sim enforces.** The engine won't start with the hydraulics
+unlocked, and the joysticks do nothing while the hydraulics are locked.
+Steps done out of order lose points. Unsafe acts (operating without the
+seatbelt, removing the belt with the hydraulics live) are logged as safety
+issues. Hazard decisions have a countdown, and moving the machine during one
+counts as a choice. **Show me** turns the camera to the control and highlights
+it. The results screen shows pass/fail (70% of the best score and no FAIL
+ending), XP, safety issues, and a step-by-step log.
+
+**Adding a module.** Add an entry to `backend/src/data/trainingModules.json`
+(no frontend change needed). Each node is one of:
+- `ACTION`: `expect` action(s), `hintTarget`, `score`, `next`
+- `DECISION`: `choices` (optionally triggered by in-cab `actions`, or
+  `hidden`), plus optional `timeoutSec`/`timeoutNext`/`graceSec`
+- `END`: `outcome` PASS/FAIL and `feedback`
+
+Optional `sceneEvent` values: `WORKER_APPROACH | WORKER_STOP_WAVE |
+WORKER_LEAVE | WORKER_IDLE_FAR | TEMP_RISE | TEMP_COOL`. Action names and hint
+targets are listed in `frontend/src/sim/scenarioEngine.js` and
+`frontend/src/sim/scene/CameraGuide.jsx`.
+
+Current limits: XP and completions are shown but **not saved** yet (no
+training progress backend). The cab and machine are built from simple shapes,
+not a CAD model.
+
+---
+
+## 9. What's not built yet
 
 Everything else in `../IMPLEMENTATION_PLAN.md`: pre-check flow, shift state
 machine, safety engine, behaviour/anomaly engine wiring, ETA service,
-training hub, AI assistant, and the E-Learning/Task History/Profile pages
+training progress/XP persistence, video/quiz and instructor modules,
+recommendations, AI assistant, and the Task History/Profile pages
 (currently placeholder screens in the sidebar).
