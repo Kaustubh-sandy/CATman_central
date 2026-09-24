@@ -10,6 +10,7 @@ const taskService = require('./task.service');
 const precheckService = require('./precheck.service');
 const incidentService = require('./incident.service');
 const mqttService = require('./mqtt.service');
+const behaviorEngine = require('./behaviorEngine.service');
 const { emit } = require('../socket/socket');
 
 const STATES = {
@@ -453,6 +454,14 @@ function endShift(operatorId, handoverNote) {
   transition(shift, STATES.SHIFT_ENDED, 'SHIFT_ENDED', { summary: shift.summary });
   const saved = save(shift);
   operatorService.addXp(operatorId, shift.summary.xpEarned, 'SHIFT_COMPLETE');
+
+  // Feed the behavior engine for skill scoring and personalized recommendations.
+  try {
+    behaviorEngine.onShiftEnd(operatorId, shift.summary, shift);
+  } catch (err) {
+    console.error('[Behavior] Error processing shift end:', err.message);
+  }
+
   return saved;
 }
 

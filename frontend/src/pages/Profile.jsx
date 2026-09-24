@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Award, Medal, CheckCircle2, Circle } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useLive } from '../context/LiveContext';
+import SkillScoreCard from '../components/SkillScoreCard';
 
 function SafetyTrend({ points }) {
   const { t } = useLive();
@@ -24,9 +25,13 @@ function SafetyTrend({ points }) {
 export default function Profile() {
   const { t } = useLive();
   const [profile, setProfile] = useState(null);
+  const [skills, setSkills] = useState(null);
 
   useEffect(() => {
     apiClient.get('/operators/me/profile').then((res) => setProfile(res.data));
+    apiClient.get('/behavior/skills').then((res) => {
+      if (res.data.skills) setSkills(res.data.skills);
+    }).catch(() => {});
   }, []);
 
   if (!profile) return <div className="max-w-4xl mx-auto text-white/60 font-condensed text-2xl uppercase">{t('dash.loading')}</div>;
@@ -54,6 +59,18 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {/* Skill overview (compact) */}
+      {skills && (
+        <section>
+          <div className="font-condensed text-label uppercase text-white/60 mb-2">{t('skills.title')}</div>
+          <div className="rounded border-2 border-border bg-surface p-4 space-y-2">
+            {['IDLE_MANAGEMENT', 'FUEL_EFFICIENCY', 'SMOOTH_OPERATION', 'SAFETY_AWARENESS', 'TASK_EXECUTION'].map((id) => (
+              <SkillScoreCard key={id} skillId={id} skill={skills[id]} compact />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section>
         <div className="font-condensed text-label uppercase text-white/60 mb-2">{t('profile.badges')}</div>

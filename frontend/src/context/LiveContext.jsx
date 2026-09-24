@@ -110,6 +110,21 @@ export function LiveProvider({ children }) {
           setToast({ text: translate(operatorRef.current?.language || 'en', 'xp.awarded', { n: x.amount }), tone: 'ok', id: Date.now() });
         }
       },
+      'behavior:loop_closed': (e) => {
+        if (e.operatorId === operatorRef.current?.operatorId && e.improved) {
+          const skill = translate(operatorRef.current?.language || 'en', `skills.area.${e.skillArea}`);
+          setToast({
+            text: translate(operatorRef.current?.language || 'en', 'behavior.loopClosed', { skill, delta: e.delta }),
+            tone: 'ok',
+            id: Date.now(),
+          });
+          // Relay to BehaviorLoopBanner if mounted.
+          if (window.__behaviorLoopHandler) window.__behaviorLoopHandler(e);
+        }
+      },
+      'behavior:skills_updated': () => {
+        // Skills updated — pages can re-fetch if needed.
+      },
     };
 
     Object.entries(handlers).forEach(([event, fn]) => socket.on(event, fn));

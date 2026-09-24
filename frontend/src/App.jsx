@@ -7,6 +7,7 @@ import ELearning from './pages/ELearning';
 import TaskHistory from './pages/TaskHistory';
 import Profile from './pages/Profile';
 import ControlRoom from './pages/ControlRoom';
+import SkillProfile from './pages/SkillProfile';
 
 // three.js is heavy; only load it when a simulation is opened.
 const SimulationPlayer = lazy(() => import('./pages/SimulationPlayer'));
@@ -21,6 +22,7 @@ export default function App() {
             <Route path="/learning" element={<ELearning />} />
             <Route path="/history" element={<TaskHistory />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/skills" element={<SkillProfile />} />
             <Route path="/control-room" element={<ControlRoom />} />
           </Route>
           <Route

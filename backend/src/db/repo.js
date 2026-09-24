@@ -5,7 +5,7 @@
 const { randomUUID } = require('crypto');
 const firestore = require('./firestore');
 
-const PRELOADED = ['machines', 'operators', 'tasks', 'shifts', 'alerts', 'incidents', 'trainingProgress'];
+const PRELOADED = ['machines', 'operators', 'tasks', 'shifts', 'alerts', 'incidents', 'trainingProgress', 'behaviorLedger'];
 const APPEND_ONLY_MEMORY_LIMIT = 500;
 const LOAD_TIMEOUT_MS = 12000;
 

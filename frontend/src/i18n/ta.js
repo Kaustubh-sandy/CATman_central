@@ -300,6 +300,41 @@ const ta = {
   'replay.waiting': 'நிகழ்வுக்குப் பிந்தைய 60 வி. பதிவாகிறது…',
 
   'error.generic': 'ஏதோ தவறு நடந்தது',
+
+  'nav.skills': 'திறன்கள்',
+
+  'skills.title': 'இயக்குநர் திறன்கள்',
+  'skills.subtitle': 'ஷிப்டுகளில் உங்கள் உண்மையான பணித்திறன்',
+  'skills.notReady': 'கண்காணிப்பைத் தொடங்க மேலும் {remaining} ஷிப்டுகளை முடிக்கவும்',
+  'skills.score': 'மதிப்பெண்',
+  'skills.trend.UP': '↑ முன்னேற்றம்',
+  'skills.trend.DOWN': '↓ குறைவு',
+  'skills.trend.STABLE': '— நிலையானது',
+  'skills.label.GOOD': 'சிறந்தது',
+  'skills.label.DEVELOPING': 'வளர்ந்து வருகிறது',
+  'skills.label.NEEDS_ATTENTION': 'கவனம் தேவை',
+  'skills.label.CRITICAL': 'முக்கியமானது',
+  'skills.area.IDLE_MANAGEMENT': 'செயலற்ற நேர மேலாண்மை (Idle)',
+  'skills.area.FUEL_EFFICIENCY': 'எரிபொருள் திறன் (Fuel)',
+  'skills.area.SMOOTH_OPERATION': 'மென்மையான இயக்கம் (Smooth Ops)',
+  'skills.area.SAFETY_AWARENESS': 'பாதுகாப்பு விழிப்புணர்வு (Safety)',
+  'skills.area.TASK_EXECUTION': 'பணி நிறைவேற்றம் (Task Execution)',
+  'skills.baseline': '{n} ஷிப்டுகளின் அடிப்படை நிலை',
+  'skills.observations': '{n} ஷிப்டுகள் பகுப்பாய்வு செய்யப்பட்டன',
+  'skills.recommendedTraining': 'பரிந்துரைக்கப்பட்ட பயிற்சி',
+  'skills.trainingLoops': 'பயிற்சியின் உண்மை தாக்கம்',
+  'skills.loopImproved': 'பயிற்சிக்குப் பிறகு +{delta} புள்ளிகள் முன்னேற்றம்',
+  'skills.loopNoChange': 'இன்னும் மாற்றம் இல்லை — பயிற்சி தொடரவும்',
+  'skills.loopPending': 'முன்னேற்றம் அளவிடப்படுகிறது…',
+  'skills.preScore': 'முன்பு',
+  'skills.postScore': 'பின்பு',
+  'skills.trainingScore': 'பயிற்சி மதிப்பெண்',
+
+  'behavior.loopClosed': '🎉 பயிற்சிக்குப் பிறகு {skill} திறனில் {delta} புள்ளிகள் முன்னேற்றம்!',
+
+  'learning.reason.SKILL_SCORE_LOW': '{skill} மதிப்பெண் {score} — {threshold} ஐ விடக் குறைவு',
+  'learning.reason.SKILL_DECLINING': '{skill} தொடர்ந்து {shifts} ஷிப்டுகளாகக் குறைகிறது',
+  'learning.reason.SAFETY_REPEAT': 'கடந்த {outOf} ஷிப்டுகளில் {count} முறை “{rule}” எச்சரிக்கை',
 };
 
 export default ta;

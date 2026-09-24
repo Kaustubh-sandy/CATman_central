@@ -24,6 +24,10 @@ const config = {
   idleLessonAfterSec: int('IDLE_LESSON_AFTER_SEC', 180),
   fuelPriceInr: int('FUEL_PRICE_INR', 95),
 
+  behaviorMinShifts: int('BEHAVIOR_MIN_SHIFTS', 3),
+  behaviorWindowShifts: int('BEHAVIOR_WINDOW_SHIFTS', 5),
+  behaviorRetrainDays: int('BEHAVIOR_RETRAIN_DAYS', 14),
+
   firebase: {
     apiKey: process.env.FIREBASE_API_KEY || null,
     authDomain: process.env.FIREBASE_AUTH_DOMAIN || null,
