@@ -726,7 +726,7 @@ Two ML pieces live in [backend/src/ml/](backend/src/ml/). The ETA model is conne
 | Piece | What it is | Status |
 |---|---|---|
 | [anomaly_ensemble.py](backend/src/ml/anomaly_ensemble.py) | Stacked anomaly ensemble (Isolation Forest, LOF, autoencoder, XGBoost, LightGBM, Random Forest + logistic meta-learner) with a `StreamDetector` for live use | No trained model file; `xgboost`/`lightgbm` not installed on this machine |
-| [ml/eta/](backend/src/ml/eta/) | Task ETA regressor: `generate_dataset.js` (50 000 synthetic rows) → `train_model.py` (HistGradientBoosting) → `model/eta_model.joblib`; `predict.py` takes telemetry JSON as a command-line argument and prints JSON; `analyze_dataset.js` profiles the CSVs | **Connected** — run by `eta.service.js` for active tasks ([§8.1](#81-model-eta-python-mlpredictpy)) |
+| [ml/eta/](backend/src/ml/eta/) | Task ETA regressor: `generate_dataset.js` (50 000 synthetic rows from a replay of the simulator's state machine) → `train_model.py` (HistGradientBoosting) → `model/eta_model.joblib`; `predict.py` takes telemetry JSON as a command-line argument and prints JSON; `analyze_dataset.js` profiles the CSVs | **Connected** — run by `eta.service.js` for active tasks ([§8.1](#81-model-eta-python-mlpredictpy)) |
 
 A plan to connect the anomaly model is in [../ML_AI_PLAN.md](../ML_AI_PLAN.md).
 

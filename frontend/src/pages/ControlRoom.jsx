@@ -91,6 +91,13 @@ export default function ControlRoom() {
                 <div className="mt-2 text-white/70">
                   {m.telemetry ? `${t(`machineState.${m.telemetry.state}`)} · ${m.telemetry.operatorId || '—'} · ${m.telemetry.engineTemperature} °C` : t('card.noData')}
                 </div>
+                {m.anomaly && m.anomaly.level !== 'WARMING' && (
+                  <div className={`mt-1 inline-flex items-center gap-1 rounded border-2 px-2 py-0.5 text-sm font-condensed font-bold uppercase ${
+                    m.anomaly.level === 'ANOMALY' ? 'border-warn text-warn' : m.anomaly.level === 'WATCH' ? 'border-white/40 text-white/70' : 'border-ok text-ok'
+                  }`}>
+                    {t('aiHealth.chip')}: {m.anomaly.level === 'ANOMALY' ? t(`aiHealth.scenario.${m.anomaly.scenario}`) : m.anomaly.level === 'WATCH' ? t('aiHealth.watchShort') : t('aiHealth.normalShort')} · {Math.round(m.anomaly.anomaly_probability * 100)}%
+                  </div>
+                )}
                 <div className={`mt-1 font-condensed font-bold ${open ? 'text-danger' : 'text-ok'}`}>
                   {open ? `${open} ${t('top.alerts')}` : <CheckCircle2 size={20} />}
                 </div>

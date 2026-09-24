@@ -2,6 +2,7 @@ const repo = require('../db/repo');
 const telemetryStore = require('./telemetryStore.service');
 const connectivityService = require('./connectivity.service');
 const etaService = require('./eta.service');
+const anomalyService = require('./anomalyDetection.service');
 
 // Display-only assumption: turns fuelLevelLitres into a fuel gauge percentage.
 const FUEL_TANK_CAPACITY_L = 400;
@@ -29,6 +30,7 @@ function composeMachineView(machine) {
     telemetry,
     fuelPercent,
     eta: etaService.get(machine.machineId),
+    anomaly: anomalyService.get(machine.machineId),
   };
 }
 

@@ -2,6 +2,7 @@ const express = require('express');
 const repo = require('../db/repo');
 const mqttService = require('../services/mqtt.service');
 const etaService = require('../services/eta.service');
+const anomalyService = require('../services/anomalyDetection.service');
 const config = require('../config/env');
 const { handle } = require('./util');
 
@@ -16,6 +17,7 @@ router.get(
     storage: repo.getStatus(),
     assistant: config.gemini.apiKey ? 'GEMINI' : 'OFFLINE',
     eta: etaService.getStatus(),
+    anomaly: anomalyService.getStatus(),
   }))
 );
 

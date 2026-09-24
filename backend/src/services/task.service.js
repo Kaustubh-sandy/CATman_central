@@ -16,13 +16,13 @@ function httpError(status, message) {
   return err;
 }
 
-// Creates today's tasks for an operator from the templates the first time they're asked for.
+// Creates today's tasks for an operator from the templates. Templates added during the
+// day (e.g. a new task in tasks.json) are created too; existing tasks are never touched.
 function ensureToday(operatorId) {
   const date = today();
-  const existing = repo.list('tasks', (t) => t.operatorId === operatorId && t.date === date);
-  if (existing.length) return;
 
   (templates[operatorId] || []).forEach((tpl, i) => {
+    if (repo.get('tasks', `${tpl.templateId}-${date}`)) return;
     repo.put('tasks', `${tpl.templateId}-${date}`, {
       ...tpl,
       operatorId,

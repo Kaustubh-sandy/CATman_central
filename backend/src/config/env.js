@@ -37,6 +37,11 @@ const config = {
     appId: process.env.FIREBASE_APP_ID || null,
   },
 
+  anomaly: {
+    enabled: process.env.ANOMALY_ENABLED !== 'false',
+    port: int('ANOMALY_PORT', 8765),
+  },
+
   eta: {
     enabled: process.env.ETA_ENABLED !== 'false',
     python: process.env.ETA_PYTHON || (process.platform === 'win32' ? 'python' : 'python3'),

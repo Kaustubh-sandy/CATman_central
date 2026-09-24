@@ -66,6 +66,9 @@ function machineSummary(machineId) {
           loadWeightKg: t.loadWeightKg,
           oilPressureKpa: t.oilPressureKpa,
           loadCycles: t.loadCycles,
+          aiHealthCheck: view.anomaly
+            ? { anomaly: view.anomaly.confirmed, scenario: view.anomaly.scenario, probability: view.anomaly.anomaly_probability, reasons: view.anomaly.reasons, note: 'ML advisory, not a safety alert' }
+            : null,
           normalRanges: { engineTemperatureC: '70-95', hydraulicTemperatureC: '60-90', vibration: '< 0.8', oilPressureKpa: '> 150 when above 800 rpm' },
         }
       : { note: 'No telemetry received yet' }),

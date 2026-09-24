@@ -1,19 +1,34 @@
 {
   "OP1001": [
-    { "templateId": "T1001", "title": "Excavate trench - Zone B", "type": "EXCAVATION", "siteZone": "Zone B", "targetLoadCycles": 6, "priority": "HIGH", "scheduledWindow": "08:00–09:00", "etaMin": 9, "etaLowMin": 8, "etaHighMin": 11 },
-    { "templateId": "T1002", "title": "Load haul trucks - Stockpile 2", "type": "LOADING", "siteZone": "Stockpile 2", "targetLoadCycles": 25, "priority": "MEDIUM", "scheduledWindow": "09:30–12:00", "etaMin": 38, "etaLowMin": 34, "etaHighMin": 46 },
-    { "templateId": "T1003", "title": "Grade access road - North gate", "type": "GRADING", "siteZone": "North Gate", "targetLoadCycles": 10, "priority": "LOW", "scheduledWindow": "13:00–15:00", "etaMin": 16, "etaLowMin": 14, "etaHighMin": 20 }
+    {"templateId":  "T1001", "title":  "Excavate trench - Zone B", "type":  "EXCAVATION", "siteZone":  "Zone B", "targetLoadCycles":  6, "priority":  "HIGH", "scheduledWindow":  "08:00–09:00", "etaMin":  9, "etaLowMin":  8, "etaHighMin":  11},
+    {"templateId":  "T1002", "title":  "Load haul trucks - Stockpile 2", "type":  "LOADING", "siteZone":  "Stockpile 2", "targetLoadCycles":  25, "priority":  "MEDIUM", "scheduledWindow":  "09:30–12:00", "etaMin":  38, "etaLowMin":  34, "etaHighMin":  46},
+    {"templateId":  "T1003", "title":  "Grade access road - North gate", "type":  "GRADING", "siteZone":  "North Gate", "targetLoadCycles":  10, "priority":  "LOW", "scheduledWindow":  "13:00–15:00", "etaMin":  16, "etaLowMin":  14, "etaHighMin":  20},
+    {"templateId":  "T1004", "title":  "Trench cleanup - Zone B", "type":  "EXCAVATION", "siteZone":  "Zone B", "targetLoadCycles":  4, "priority":  "HIGH", "scheduledWindow":  "10:00–10:30", "etaMin":  6, "etaLowMin":  5, "etaHighMin":  9},
+    {"templateId":  "T1005", "title":  "Load haul truck - Stockpile 2", "type":  "LOADING", "siteZone":  "Stockpile 2", "targetLoadCycles":  5, "priority":  "MEDIUM", "scheduledWindow":  "10:30–11:15", "etaMin":  8, "etaLowMin":  6, "etaHighMin":  11},
+    {"templateId":  "T1006", "title":  "Backfill pipe trench - Zone C", "type":  "EXCAVATION", "siteZone":  "Zone C", "targetLoadCycles":  3, "priority":  "MEDIUM", "scheduledWindow":  "11:30–12:00", "etaMin":  4, "etaLowMin":  4, "etaHighMin":  7},
+    {"templateId":  "T1007", "title":  "Stockpile levelling - North gate", "type":  "GRADING", "siteZone":  "North Gate", "targetLoadCycles":  4, "priority":  "LOW", "scheduledWindow":  "14:00–14:45", "etaMin":  6, "etaLowMin":  5, "etaHighMin":  9},
+    {"templateId":  "T1008", "title":  "Load haul truck - Stockpile 1", "type":  "LOADING", "siteZone":  "Stockpile 1", "targetLoadCycles":  6, "priority":  "HIGH", "scheduledWindow":  "15:00–16:00", "etaMin":  9, "etaLowMin":  8, "etaHighMin":  13}
   ],
   "OP1002": [
-    { "templateId": "T2001", "title": "Clear debris - Zone A", "type": "EXCAVATION", "siteZone": "Zone A", "targetLoadCycles": 18, "priority": "HIGH", "scheduledWindow": "08:00–10:30", "etaMin": 28, "etaLowMin": 25, "etaHighMin": 34 }
+    {"templateId":  "T2001", "title":  "Clear debris - Zone A", "type":  "EXCAVATION", "siteZone":  "Zone A", "targetLoadCycles":  18, "priority":  "HIGH", "scheduledWindow":  "08:00–10:30", "etaMin":  28, "etaLowMin":  25, "etaHighMin":  34},
+    {"templateId":  "T2002", "title":  "Load haul truck - Stockpile 1", "type":  "LOADING", "siteZone":  "Stockpile 1", "targetLoadCycles":  4, "priority":  "HIGH", "scheduledWindow":  "10:30–11:15", "etaMin":  6, "etaLowMin":  5, "etaHighMin":  9},
+    {"templateId":  "T2003", "title":  "Drainage ditch - Zone A", "type":  "EXCAVATION", "siteZone":  "Zone A", "targetLoadCycles":  5, "priority":  "MEDIUM", "scheduledWindow":  "11:30–12:30", "etaMin":  8, "etaLowMin":  6, "etaHighMin":  11},
+    {"templateId":  "T2004", "title":  "Site clearing - Gate 2", "type":  "GRADING", "siteZone":  "Gate 2", "targetLoadCycles":  3, "priority":  "LOW", "scheduledWindow":  "14:00–14:30", "etaMin":  4, "etaLowMin":  4, "etaHighMin":  7}
   ],
   "OP1003": [
-    { "templateId": "T3001", "title": "Trench backfill - Zone C", "type": "EXCAVATION", "siteZone": "Zone C", "targetLoadCycles": 32, "priority": "MEDIUM", "scheduledWindow": "09:00–13:00", "etaMin": 48, "etaLowMin": 43, "etaHighMin": 57 }
+    {"templateId":  "T3001", "title":  "Trench backfill - Zone C", "type":  "EXCAVATION", "siteZone":  "Zone C", "targetLoadCycles":  32, "priority":  "MEDIUM", "scheduledWindow":  "09:00–13:00", "etaMin":  48, "etaLowMin":  43, "etaHighMin":  57},
+    {"templateId":  "T3002", "title":  "Foundation dig - Block C", "type":  "EXCAVATION", "siteZone":  "Block C", "targetLoadCycles":  4, "priority":  "HIGH", "scheduledWindow":  "13:00–13:45", "etaMin":  6, "etaLowMin":  5, "etaHighMin":  9},
+    {"templateId":  "T3003", "title":  "Load haul truck - Stockpile 3", "type":  "LOADING", "siteZone":  "Stockpile 3", "targetLoadCycles":  5, "priority":  "MEDIUM", "scheduledWindow":  "14:00–15:00", "etaMin":  8, "etaLowMin":  6, "etaHighMin":  11},
+    {"templateId":  "T3004", "title":  "Spoil heap levelling - Zone C", "type":  "GRADING", "siteZone":  "Zone C", "targetLoadCycles":  3, "priority":  "LOW", "scheduledWindow":  "15:15–15:45", "etaMin":  4, "etaLowMin":  4, "etaHighMin":  7}
   ],
   "OP1004": [
-    { "templateId": "T4001", "title": "Load haul trucks - Stockpile 1", "type": "LOADING", "siteZone": "Stockpile 1", "targetLoadCycles": 20, "priority": "MEDIUM", "scheduledWindow": "10:00–12:00", "etaMin": 30, "etaLowMin": 27, "etaHighMin": 36 }
+    {"templateId":  "T4001", "title":  "Load haul trucks - Stockpile 1", "type":  "LOADING", "siteZone":  "Stockpile 1", "targetLoadCycles":  20, "priority":  "MEDIUM", "scheduledWindow":  "10:00–12:00", "etaMin":  30, "etaLowMin":  27, "etaHighMin":  36},
+    {"templateId":  "T4002", "title":  "Load haul truck - Stockpile 2", "type":  "LOADING", "siteZone":  "Stockpile 2", "targetLoadCycles":  4, "priority":  "MEDIUM", "scheduledWindow":  "12:30–13:15", "etaMin":  6, "etaLowMin":  5, "etaHighMin":  9},
+    {"templateId":  "T4003", "title":  "Cable trench - Zone D", "type":  "EXCAVATION", "siteZone":  "Zone D", "targetLoadCycles":  5, "priority":  "HIGH", "scheduledWindow":  "14:00–15:00", "etaMin":  8, "etaLowMin":  6, "etaHighMin":  11}
   ],
   "OP1005": [
-    { "templateId": "T5001", "title": "Excavate foundation - Block D", "type": "EXCAVATION", "siteZone": "Block D", "targetLoadCycles": 28, "priority": "HIGH", "scheduledWindow": "08:00–11:00", "etaMin": 42, "etaLowMin": 38, "etaHighMin": 50 }
+    {"templateId":  "T5001", "title":  "Excavate foundation - Block D", "type":  "EXCAVATION", "siteZone":  "Block D", "targetLoadCycles":  28, "priority":  "HIGH", "scheduledWindow":  "08:00–11:00", "etaMin":  42, "etaLowMin":  38, "etaHighMin":  50},
+    {"templateId":  "T5002", "title":  "Footing excavation - Block D", "type":  "EXCAVATION", "siteZone":  "Block D", "targetLoadCycles":  4, "priority":  "HIGH", "scheduledWindow":  "11:30–12:15", "etaMin":  6, "etaLowMin":  5, "etaHighMin":  9},
+    {"templateId":  "T5003", "title":  "Load haul truck - Stockpile 4", "type":  "LOADING", "siteZone":  "Stockpile 4", "targetLoadCycles":  5, "priority":  "MEDIUM", "scheduledWindow":  "13:00–14:00", "etaMin":  8, "etaLowMin":  6, "etaHighMin":  11}
   ]
 }

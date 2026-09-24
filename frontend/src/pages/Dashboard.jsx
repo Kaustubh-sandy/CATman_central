@@ -13,6 +13,7 @@ import SafetyChecklist from '../components/dashboard/SafetyChecklist';
 import ActiveTaskPanel from '../components/dashboard/ActiveTaskPanel';
 import EnvelopeIndicator from '../components/dashboard/EnvelopeIndicator';
 import BehaviourCard from '../components/dashboard/BehaviourCard';
+import AiHealthCard from '../components/dashboard/AiHealthCard';
 import ShiftSummary from '../components/dashboard/ShiftSummary';
 import EndShiftForm from '../components/dashboard/EndShiftForm';
 import AlertItem from '../components/alerts/AlertItem';
@@ -98,8 +99,9 @@ export default function Dashboard() {
   const nextTask = tasks.find((x) => x.status === 'PENDING');
   const canEndShift = ['PRECHECK_PASSED', 'CHECKLIST_COMPLETE', 'TASK_ACTIVE', 'TASK_PAUSED', 'TASK_COMPLETE', 'PRECHECK_FAILED'].includes(state);
   const machineCard = (
-    <div id="focus-machine">
+    <div id="focus-machine" className="space-y-4">
       <MachineStatusCard machine={machine} compact={['TASK_ACTIVE', 'TASK_PAUSED'].includes(state)} />
+      <AiHealthCard machine={machine} />
     </div>
   );
 

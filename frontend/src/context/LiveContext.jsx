@@ -87,6 +87,7 @@ export function LiveProvider({ children }) {
               : m
           )
         ),
+      'anomaly:updated': (a) => setMachines((prev) => prev.map((m) => (m.machineId === a.machineId ? { ...m, anomaly: a } : m))),
       'eta:updated': (e) => setMachines((prev) => prev.map((m) => (m.machineId === e.machineId ? { ...m, eta: e } : m))),
       'machine:connectivity': (u) =>
         setMachines((prev) =>
