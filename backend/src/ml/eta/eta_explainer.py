@@ -145,4 +145,4 @@ class ETAExplainer:
             reverse=True
         )
 
-        return explanation
+        return explanation[:5]
