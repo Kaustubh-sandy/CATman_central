@@ -5,6 +5,8 @@ from pathlib import Path
 import joblib
 import pandas as pd
 
+from eta_explainer import ETAExplainer
+
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -12,6 +14,12 @@ MODEL_PATH = (
     BASE_DIR
     / "model"
     / "eta_model.joblib"
+)
+
+TRAIN_DATA_PATH = (
+    BASE_DIR
+    / "data"
+    / "train.csv"
 )
 
 
@@ -34,10 +42,40 @@ def predict_eta(payload):
         dataframe
     )[0]
 
-    return round(
-        float(prediction),
-        2,
+    train_data = pd.read_csv(
+        TRAIN_DATA_PATH
     )
+
+    # Remove target column
+    target_column = "eta_minutes"
+
+    if target_column in train_data.columns:
+        train_data = train_data.drop(
+            columns=[target_column]
+        )
+
+    # Use a small background sample
+    background_data = train_data.sample(
+        n=min(50, len(train_data)),
+        random_state=42
+    )
+
+    explainer = ETAExplainer(
+        pipeline,
+        background_data
+    )
+
+    explanation = explainer.explain(
+        dataframe
+    )
+
+    return {
+        "eta_minutes": round(
+            float(prediction),
+            2
+        ),
+        "explanation": explanation
+    }
 
 
 def main():
@@ -60,16 +98,12 @@ def main():
             sys.argv[1]
         )
 
-        eta = predict_eta(
+        result = predict_eta(
             payload
         )
 
         print(
-            json.dumps(
-                {
-                    "eta_minutes": eta
-                }
-            )
+            json.dumps(result)
         )
 
     except Exception as error:
