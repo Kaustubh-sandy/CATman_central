@@ -81,6 +81,7 @@ export function LiveProvider({ children }) {
               : m
           )
         ),
+      'eta:updated': (e) => setMachines((prev) => prev.map((m) => (m.machineId === e.machineId ? { ...m, eta: e } : m))),
       'machine:connectivity': (u) =>
         setMachines((prev) =>
           prev.map((m) => (m.machineId === u.machineId ? { ...m, connectivity: { status: u.status, lastSeenAt: u.lastSeenAt } } : m))

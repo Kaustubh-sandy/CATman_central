@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pause, Play, CheckCircle2, HelpCircle, TrendingDown, TrendingUp, MapPin } from 'lucide-react';
 import { useLive } from '../../context/LiveContext';
 import PrimaryButton from '../PrimaryButton';
+import EtaPanel from './EtaPanel';
 
 function ProgressRing({ value, max }) {
   const size = 150;
@@ -81,6 +82,8 @@ export default function ActiveTaskPanel({ task, paused }) {
           )}
         </div>
       </div>
+
+      <EtaPanel taskId={task.id} />
 
       {p.targetReached && (
         <div className="rounded border-2 border-ok text-ok p-3 font-condensed font-bold text-xl">{t('active.targetReached')}</div>

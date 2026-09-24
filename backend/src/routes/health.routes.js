@@ -1,6 +1,7 @@
 const express = require('express');
 const repo = require('../db/repo');
 const mqttService = require('../services/mqtt.service');
+const etaService = require('../services/eta.service');
 const config = require('../config/env');
 const { handle } = require('./util');
 
@@ -14,6 +15,7 @@ router.get(
     mqtt: mqttService.isConnected() ? 'CONNECTED' : 'DISCONNECTED',
     storage: repo.getStatus(),
     assistant: config.gemini.apiKey ? 'GEMINI' : 'OFFLINE',
+    eta: etaService.getStatus(),
   }))
 );
 

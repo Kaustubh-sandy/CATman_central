@@ -12,6 +12,7 @@ const shiftService = require('./services/shift.service');
 const alertService = require('./services/alert.service');
 const idleLessonService = require('./services/idleLesson.service');
 const taskService = require('./services/task.service');
+const etaService = require('./services/eta.service');
 const bus = require('./services/bus');
 
 const app = express();
@@ -63,6 +64,7 @@ async function start() {
   alertService.init({ shiftLookup: shiftService.getActiveShiftForMachine });
   idleLessonService.init({ shiftLookup: shiftService.getActiveShiftForMachine });
   bus.on('telemetry', (machineId, telemetry) => taskService.onTelemetry(machineId, telemetry));
+  etaService.init();
 
   mqttService.init();
 

@@ -33,6 +33,13 @@ const config = {
     appId: process.env.FIREBASE_APP_ID || null,
   },
 
+  eta: {
+    enabled: process.env.ETA_ENABLED !== 'false',
+    python: process.env.ETA_PYTHON || (process.platform === 'win32' ? 'python' : 'python3'),
+    intervalMs: int('ETA_INTERVAL_MS', 15000),
+    timeoutMs: int('ETA_TIMEOUT_MS', 30000),
+  },
+
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || null,
     models: (process.env.GEMINI_MODELS || 'gemini-3.6-flash,gemini-3.5-flash,gemini-3.1-flash-lite')
