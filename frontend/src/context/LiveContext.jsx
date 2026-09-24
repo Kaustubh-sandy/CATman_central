@@ -26,6 +26,7 @@ export function LiveProvider({ children }) {
   const [behaviour, setBehaviour] = useState(null);
   // Bumped when the skill engine re-scores this operator, so skill pages re-fetch.
   const [skillsVersion, setSkillsVersion] = useState(0);
+  const [reminders, setReminders] = useState([]);
   const [idlePrompt, setIdlePrompt] = useState(null);
   const [toast, setToast] = useState(null);
   const [alertCenterOpen, setAlertCenterOpen] = useState(false);
@@ -226,8 +227,33 @@ export function LiveProvider({ children }) {
     (i) => i.type === 'SOS' && i.operatorId === operator?.operatorId && ['OPEN', 'ACKNOWLEDGED'].includes(i.status)
   );
 
+  // Assistant reminders: polled, and refreshed shortly after anything that changes them.
+  const refreshReminders = useCallback(() => {
+    apiClient.get('/assistant/reminders').then((res) => setReminders(res.data)).catch(() => {});
+  }, []);
+  useEffect(() => {
+    refreshReminders();
+    const id = setInterval(refreshReminders, 20000);
+    return () => clearInterval(id);
+  }, [refreshReminders]);
+  const reminderKey = [
+    shift?.id,
+    shift?.state,
+    Object.values(shift?.checklist?.items || {}).filter((i) => i.checked).length,
+    shift?.precheck?.warningsAcknowledgedAt,
+    openAlerts.filter((a) => ['ALERTED', 'ESCALATED'].includes(a.status)).length,
+    tasks.map((x) => x.status).join(','),
+    mySos?.status,
+  ].join('|');
+  useEffect(() => {
+    const id = setTimeout(refreshReminders, 800);
+    return () => clearTimeout(id);
+  }, [reminderKey, refreshReminders]);
+
   const value = {
     connected,
+    reminders,
+    refreshReminders,
     operator,
     language,
     t,

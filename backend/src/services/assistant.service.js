@@ -8,6 +8,7 @@ const incidentService = require('./incident.service');
 const trainingService = require('./training.service');
 const siteService = require('./site.service');
 const { computeEnvelope } = require('./safety.engine');
+const insights = require('./assistantInsights.service');
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const MAX_TOOL_ROUNDS = 5;
@@ -141,11 +142,11 @@ const TOOLS = {
     },
   },
   getIncidents: {
-    description: 'Incidents: SOS calls, critical safety incidents and maintenance tickets. Filter by type (SOS, SAFETY_ALERT, MAINTENANCE) and number of days back.',
-    parameters: { type: 'object', properties: { type: { type: 'string' }, days: { type: 'number' } } },
-    run: ({ type, days = 7 }) =>
+    description: 'List of incidents (SOS calls, critical safety incidents, maintenance tickets) for this operator. Filter by type (SOS, SAFETY_ALERT, MAINTENANCE) and number of days back. Set allOperators for the whole site.',
+    parameters: { type: 'object', properties: { type: { type: 'string' }, days: { type: 'number' }, allOperators: { type: 'boolean' } } },
+    run: ({ type, days = 7, allOperators = false }, ctx) =>
       incidentService
-        .list({ type, since: new Date(Date.now() - days * 86400000).toISOString() })
+        .list({ type, operatorId: allOperators ? undefined : ctx.operator.operatorId, since: new Date(Date.now() - days * 86400000).toISOString() })
         .slice(0, 20)
         .map((i) => ({ id: i.id, type: i.type, status: i.status, machineId: i.machineId, rule: i.ruleId || null, reason: i.reason || null, createdAt: i.createdAt })),
   },
@@ -186,6 +187,33 @@ const TOOLS = {
       return { ...site, safetyEnvelope: computeEnvelope(t, site) };
     },
   },
+  getWorkSummary: {
+    description:
+      "Summary of the operator's work for a period: tasks (done, open, cycles, actual vs planned minutes, fuel, idle, alerts per task), finished shifts (safety score, seatbelt %, fuel, XP), alerts by severity and rule, incidents and notable log events (failed pre-checks, manual overrides, checklist mismatches, escalations, SOS). Use for 'summarise today', 'how did my shift go', 'what did I do this week'.",
+    parameters: {
+      type: 'object',
+      properties: { period: { type: 'string', enum: ['today', 'yesterday', 'week', 'shift'], description: 'Default today' } },
+    },
+    run: ({ period }, ctx) => insights.summarizeWork(ctx.operator.operatorId, { period }),
+  },
+  getIncidentSummary: {
+    description:
+      'What happened in one incident: type, rule, reason, timeline (raised, escalated, acknowledged by whom, resolved), and black-box facts around the event (seatbelt, nearest person, speed, temperatures, impact). Without incidentId it uses the latest incident of this operator.',
+    parameters: { type: 'object', properties: { incidentId: { type: 'string', description: 'e.g. INC-..., SOS-..., MNT-...' } } },
+    run: ({ incidentId }, ctx) => insights.summarizeIncident(ctx.operator.operatorId, { incidentId }),
+  },
+  getImprovementPlan: {
+    description:
+      "How the operator can improve their safety score and skills: this shift's score and where points were lost, weakest skills with the metric behind each penalty, repeated alerts this week, a concrete action for each, points at stake, and recommended training. Use for 'how do I improve', 'why is my score low', 'what am I doing wrong'.",
+    parameters: { type: 'object', properties: {} },
+    run: (args, ctx) => insights.improvementPlan(ctx.operator.operatorId),
+  },
+  getReminders: {
+    description:
+      "Things that need the operator's attention now, most important first: unacknowledged alerts, open SOS, seatbelt open, next shift step (pre-check, warnings, checklist, start/resume task, end shift), task behind plan, break due, long idling, low fuel, weather, open maintenance ticket, training to do while parked.",
+    parameters: { type: 'object', properties: {} },
+    run: (args, ctx) => insights.reminders(ctx.operator.operatorId),
+  },
   navigate: {
     description:
       'Open a screen or section of the operator app for the user. Call this whenever the user wants to see, open, go to, start, or do something that lives on a screen (e.g. "run pre-check", "show my alerts", "start seatbelt training", "open task history").',
@@ -224,11 +252,20 @@ function systemPrompt(ctx, language) {
   return [
     `You are the in-cab assistant for a Caterpillar excavator operator: ${ctx.operator.name} (${ctx.operator.operatorId}), working on machine ${ctx.machineId}.`,
     `The current time is ${new Date().toLocaleString('en-IN')}.`,
-    `Always reply in ${LANGUAGE_NAMES[language] || 'English'}. Keep replies to 1-3 short sentences, plain words, numbers with units. No markdown.`,
+    `Always reply in ${LANGUAGE_NAMES[language] || 'English'}. Keep replies to 1-3 short sentences, plain words, numbers with units. No markdown. For a summary, an improvement plan or reminders you may use up to 6 short lines starting with "• ".`,
     'Use the tools for ANY fact about the machine, alerts, tasks, shift, pre-check, training, incidents or site. Never guess values.',
     'When the user wants to see, open, start or do something that lives on a screen, call navigate as well as answering.',
     'For training requests, pick the module whose objectives match (e.g. seatbelt / start-up → SIM_STARTUP, people near the machine → SIM_PROXIMITY_RAIN, overheating → SIM_OVERHEAT, parking / idling → SIM_SHUTDOWN) and navigate to learning_module with that moduleId.',
     'The dashboard flow is: run machine pre-check → safety checklist (seatbelt checked by sensor, horn tested by machine) → start task → complete task → end shift.',
+    'Summaries (today, a shift, the week): call getWorkSummary. Lead with tasks done and time vs plan, then safety (alerts, seatbelt %), then anything unusual (incidents, failed pre-check, escalations). If nothing happened, say so.',
+    'About one incident ("what happened", "why did the alarm go off"): call getIncidentSummary and explain the cause from the black-box facts, who responded, and what to do next time.',
+    'Improving score, skills or behaviour: call getImprovementPlan. Give the 2-3 actions with the most points at stake, say how many points each costs, and offer the recommended training (navigate to learning_module).',
+    'Reminders or "what should I remember / anything I missed": call getReminders and list them by priority. When answering "what do I do next", also check getReminders.',
+    'Coach, do not scold: say what went well before what to fix.',
+    'Times in tool results: always say the *Local field (e.g. atLocal "24 Sept, 11:07"); the plain ISO timestamps are UTC.',
+    'Pick the tool by meaning, in any language: improve / better / score / सुधार / बेहतर / स्कोर / மேம்படுத்த / மதிப்பெண் → getImprovementPlan; summary / सारांश / आज क्या किया / சுருக்கம் → getWorkSummary; remind / याद / நினைவூட்டு → getReminders; what happened / क्या हुआ / என்ன நடந்தது → getIncidentSummary.',
+    'navigate only opens a screen: always answer the question in words as well.',
+    'Name training modules by their title (e.g. "End-of-shift shutdown"), never by their moduleId.',
     'If no tool covers the question, say you do not have that information. Never tell the operator to ignore a safety alert.',
     'In an emergency tell them to hold the red SOS button for 2 seconds.',
   ].join('\n');
@@ -256,6 +293,17 @@ async function callGemini(model, body) {
   }
 }
 
+// A model that answered "quota exceeded" (HTTP 429) is skipped for a while, so each
+// question doesn't wait on calls that are sure to fail before reaching a working model.
+const QUOTA_COOLDOWN_MS = 60 * 1000;
+const coolingUntil = new Map(); // model -> ms
+
+function availableModels() {
+  const now = Date.now();
+  const ready = config.gemini.models.filter((m) => (coolingUntil.get(m) || 0) <= now);
+  return ready.length ? ready : [...config.gemini.models];
+}
+
 async function chatWithGemini(message, history, ctx, language) {
   const functionDeclarations = Object.entries(TOOLS).map(([name, t]) => ({ name, description: t.description, parameters: t.parameters }));
   const contents = [
@@ -263,7 +311,7 @@ async function chatWithGemini(message, history, ctx, language) {
     { role: 'user', parts: [{ text: message }] },
   ];
 
-  let models = [...config.gemini.models];
+  let models = availableModels();
   let lastError = null;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
@@ -278,6 +326,7 @@ async function chatWithGemini(message, history, ctx, language) {
       } catch (err) {
         lastError = err;
         console.warn(`[Assistant] ${models[0]} failed: ${err.message.slice(0, 120)}`);
+        if (err.status === 429) coolingUntil.set(models[0], Date.now() + QUOTA_COOLDOWN_MS);
         models = models.slice(1);
       }
     }
@@ -311,7 +360,79 @@ async function chatWithGemini(message, history, ctx, language) {
 
 // ---------------- Offline fallback ----------------
 
+function fmtSummary(s) {
+  const topRule = Object.entries(s.alerts.byRule).sort((a, b) => b[1] - a[1])[0];
+  const lines = [
+    `• ${s.period}: ${s.tasks.completed} task(s) done (${s.tasks.onTime} on time), ${s.tasks.incomplete} incomplete, ${s.tasks.stillOpen} still open; ${s.tasks.totalCycles} cycles, ${s.tasks.totalFuelL} L fuel.`,
+    `• Alerts: ${s.alerts.total}${topRule ? ` (${Object.entries(s.alerts.bySeverity).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(', ')}); most often ${topRule[0]}` : ''}.`,
+  ];
+  if (s.currentShift.safetyScore !== undefined) lines.push(`• This shift: safety score ${s.currentShift.safetyScore}, seatbelt ${s.currentShift.seatbeltCompliancePct ?? '—'}%.`);
+  s.shifts.slice(0, 2).forEach((sh) => lines.push(`• Shift ended ${sh.endedAtLocal}: score ${sh.safetyScore}, ${sh.tasksDone} task(s), ${sh.fuelUsedL} L.`));
+  if (s.incidents.length) lines.push(`• Incidents: ${s.incidents.map((i) => `${i.type}${i.rule ? ` ${i.rule}` : ''} (${i.status})`).join(', ')}.`);
+  if (s.notableEvents.length) lines.push(`• Also: ${[...new Set(s.notableEvents.map((e) => e.type))].join(', ')}.`);
+  return lines.join('\n');
+}
+
+function fmtPlan(p) {
+  const lines = [];
+  if (p.currentShift.safetyScore !== undefined) lines.push(`• Safety score this shift: ${p.currentShift.safetyScore}.`);
+  p.actions.slice(0, 3).forEach((a) => lines.push(`• ${a.evidence}${a.pointsAtStake ? ` (−${a.pointsAtStake})` : ''}: ${a.action || 'see training'}`));
+  if (!p.actions.length) lines.push('• No points lost — keep it up.');
+  if (p.training[0]) lines.push(`• Training: ${p.training[0].title}.`);
+  return lines.join('\n');
+}
+
+function fmtIncident(i) {
+  if (i.note) return i.note;
+  const b = i.blackBox?.atEvent;
+  return [
+    `• ${i.type}${i.rule ? ` ${i.rule}` : ''} on ${i.machineId} at ${i.atLocal} — ${i.reason || ''} (${i.status}).`,
+    b ? `• At that moment: ${b.state}, seatbelt ${b.seatbeltFastened ? 'on' : 'OFF'}, nearest object ${b.nearestObjectM} m, ${b.engineTemperatureC} °C.` : null,
+    `• ${i.timeline.map((x) => `${x.step.toLowerCase()} ${x.atLocal}${x.by && x.by !== 'SYSTEM' ? ` by ${x.by}` : ''}`).join(' → ')}.`,
+    i.whatToDo ? `• Next time: ${i.whatToDo}` : null,
+  ].filter(Boolean).join('\n');
+}
+
+const REMINDER_TEXT = {
+  ALERT_UNACKED: (p) => `Acknowledge the ${p.ruleId} alert`,
+  SOS_OPEN: () => 'Your SOS is open — cancel it if you are safe',
+  SEATBELT_OPEN: () => 'Fasten your seatbelt',
+  RUN_PRECHECK: () => 'Run the machine pre-check',
+  PRECHECK_FAILED: (p) => `Pre-check failed — ticket ${p.ticketId}, spare machine ${p.spare}`,
+  ACK_WARNINGS: (p) => `Acknowledge pre-check warnings (${p.sensors})`,
+  CHECKLIST_LEFT: (p) => `${p.count} checklist item(s) left`,
+  RESUME_TASK: (p) => `Resume "${p.title}"`,
+  TARGET_REACHED: (p) => `Target reached — complete "${p.title}"`,
+  TASK_BEHIND: (p) => `"${p.title}" is about ${p.minutes} min behind plan`,
+  START_TASK: (p) => `Start "${p.title}"`,
+  END_SHIFT: () => 'All tasks done — end the shift with a handover note',
+  BREAK_DUE: (p) => `${p.hours} h without a break — take 10 minutes`,
+  IDLE_LONG: (p) => `Idling for ${p.minutes} min — switch off if waiting`,
+  LOW_FUEL: (p) => `Fuel at ${p.pct}% — plan a refuel`,
+  WEATHER: (p) => `${p.weather}: keep people at least ${p.criticalM} m away`,
+  MAINTENANCE_OPEN: (p) => `Maintenance ticket ${p.ticketId} is open for this machine`,
+  TRAINING: (p) => `Training suggested: ${p.title}`,
+};
+
 const INTENTS = [
+  { match: /summar|recap|how did (my|the) (day|shift)|today'?s (task|work)|what did i do|सारांश|आज का|சுருக்க|இன்று/i, run: (ctx, message) => {
+      const period = /week|हफ्त|सप्ताह|வாரம்/i.test(message) ? 'week' : /yesterday|कल|நேற்று/i.test(message) ? 'yesterday' : 'today';
+      runTool('navigate', { target: 'history' }, ctx);
+      return fmtSummary(runTool('getWorkSummary', { period }, ctx));
+    } },
+  { match: /improve|better|my score|score low|doing wrong|सुधार|बेहतर|स्कोर|மேம்படுத்த|மதிப்பெண்/i, run: (ctx) => {
+      const plan = runTool('getImprovementPlan', {}, ctx);
+      if (plan.training?.[0]) runTool('navigate', { target: 'learning_module', moduleId: plan.training[0].moduleId }, ctx);
+      return fmtPlan(plan);
+    } },
+  { match: /remind|reminder|forget|missed|याद|भूल|நினைவூட்ட|மறந்த/i, run: (ctx) => {
+      const list = runTool('getReminders', {}, ctx);
+      return list.length ? list.slice(0, 6).map((r) => `• ${REMINDER_TEXT[r.code] ? REMINDER_TEXT[r.code](r.params) : r.code}`).join('\n') : 'Nothing needs your attention right now.';
+    } },
+  { match: /what happened|incident|why did .*(alarm|alert)|क्या हुआ|घटना|என்ன நடந்த|சம்பவ/i, run: (ctx, message) => {
+      const id = (message.match(/\b(INC|SOS|MNT)-[A-Z0-9]+\b/i) || [])[0];
+      return fmtIncident(runTool('getIncidentSummary', { incidentId: id ? id.toUpperCase() : undefined }, ctx));
+    } },
   { match: /sos|emergency|help me|accident|injur|आपात|मदद|உதவி|அவசர/i, run: (ctx) => { runTool('navigate', { target: 'sos' }, ctx); return 'In an emergency hold the red SOS button for 2 seconds. Your supervisor gets your location.'; } },
   { match: /pre.?check|sensor|प्री|சோதனை/i, run: (ctx) => {
       runTool('navigate', { target: 'precheck' }, ctx);
@@ -332,9 +453,9 @@ const INTENTS = [
 function chatOffline(message, ctx) {
   const intent = INTENTS.find((i) => i.match.test(message));
   if (!intent) {
-    return 'I can answer about your machine, alerts, tasks, pre-check, training, idle time and site conditions.';
+    return 'I can answer about your machine, alerts, tasks, pre-check, training, idle time and site conditions, summarise your day, explain an incident, give reminders and tell you how to improve your score.';
   }
-  return intent.run(ctx);
+  return intent.run(ctx, message);
 }
 
 // ---------------- Entry point ----------------
@@ -363,4 +484,4 @@ async function chat({ operatorId, message, history = [], language }) {
   return { reply, actions: ctx.actions, toolCalls: ctx.toolCalls, mode: 'offline' };
 }
 
-module.exports = { chat, NAV_TARGETS, TOOLS };
+module.exports = { chat, NAV_TARGETS, TOOLS, REMINDER_TEXT };

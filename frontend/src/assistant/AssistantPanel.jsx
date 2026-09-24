@@ -1,21 +1,44 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Send, Volume2, ExternalLink, WifiOff, Loader2 } from 'lucide-react';
+import { X, Send, Volume2, ExternalLink, WifiOff, Loader2, BellRing, ChevronRight } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useLive } from '../context/LiveContext';
 import { useAssistantNavigation } from './useAssistantNavigation';
 import { speak } from '../utils/alarm';
 import { speechCode } from '../i18n';
 
-const CHIPS = ['assistant.chip.next', 'assistant.chip.machine', 'assistant.chip.alerts', 'assistant.chip.training'];
+const CHIPS = [
+  'assistant.chip.next',
+  'assistant.chip.summary',
+  'assistant.chip.improve',
+  'assistant.chip.incident',
+];
+const REMINDER_STYLE = {
+  HIGH: 'border-danger text-danger',
+  MEDIUM: 'border-warn text-warn',
+  LOW: 'border-white/30 text-white/80',
+};
+
+// Reminder text in the operator's language; falls back to the backend's English text.
+function reminderText(r, t) {
+  const key = `reminder.${r.code}`;
+  const params = { ...r.params };
+  if (params.ruleId) params.rule = t(`alert.title.${params.ruleId}`);
+  const text = t(key, params);
+  return text === key ? r.text : text;
+}
 const HISTORY_TURNS = 8;
 
 export default function AssistantPanel() {
-  const { t, language, operator, assistantOpen, setAssistantOpen } = useLive();
+  const { t, language, operator, assistantOpen, setAssistantOpen, reminders, refreshReminders } = useLive();
   const go = useAssistantNavigation();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const listRef = useRef(null);
+
+  useEffect(() => {
+    if (assistantOpen) refreshReminders();
+  }, [assistantOpen, refreshReminders]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
@@ -51,6 +74,24 @@ export default function AssistantPanel() {
       </div>
 
       <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-3">
+        {reminders.length > 0 && (
+          <section aria-label={t('assistant.reminders')} className="space-y-2">
+            <div className="font-condensed text-label uppercase tracking-wide text-white/60 flex items-center gap-2">
+              <BellRing size={18} strokeWidth={2.5} /> {t('assistant.reminders')}
+            </div>
+            {reminders.slice(0, 5).map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => r.action && go(r.action)}
+                className={`w-full min-h-[48px] rounded border-2 bg-surface px-3 py-2 text-left flex items-center gap-2 font-semibold ${REMINDER_STYLE[r.priority]}`}
+              >
+                <span className="flex-1">{reminderText(r, t)}</span>
+                {r.action && <ChevronRight size={20} strokeWidth={2.5} className="shrink-0" />}
+              </button>
+            ))}
+          </section>
+        )}
         <div className="rounded border-2 border-border bg-surface p-3 text-lg">{t('assistant.hello', { name: operator?.name?.split(' ')[0] || '' })}</div>
         {messages.map((m, i) => (
           <div key={i} className={m.role === 'user' ? 'flex justify-end' : ''}>

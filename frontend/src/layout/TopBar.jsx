@@ -6,7 +6,8 @@ import StatusPill from '../components/StatusPill';
 import SosButton from '../components/sos/SosButton';
 
 export default function TopBar() {
-  const { t, operator, machine, language, openAlerts, actions, setAlertCenterOpen, assistantOpen, setAssistantOpen } = useLive();
+  const { t, operator, machine, language, openAlerts, actions, setAlertCenterOpen, assistantOpen, setAssistantOpen, reminders } = useLive();
+  const urgentReminders = reminders.filter((r) => r.priority !== 'LOW');
   const [sunMode, setSunMode] = useState(false);
 
   useEffect(() => {
@@ -83,13 +84,23 @@ export default function TopBar() {
       <button
         type="button"
         onClick={() => setAssistantOpen(!assistantOpen)}
-        className={`flex items-center gap-2 h-touch px-3 rounded border-2 border-catYellow font-condensed font-bold uppercase tracking-wide transition-colors ${
+        className={`relative flex items-center gap-2 h-touch px-3 rounded border-2 border-catYellow font-condensed font-bold uppercase tracking-wide transition-colors ${
           assistantOpen ? 'bg-catYellow text-ink' : 'text-catYellow hover:bg-catYellow hover:text-ink'
         }`}
         aria-label={t('top.assistant')}
       >
         <MessageCircle size={22} strokeWidth={2.5} />
         <span className="hidden sm:inline">{t('top.assistant')}</span>
+        {urgentReminders.length > 0 && (
+          <span
+            className={`absolute -top-2 -right-2 min-w-[24px] h-6 px-1 rounded-full font-condensed font-bold text-base flex items-center justify-center ${
+              urgentReminders.some((r) => r.priority === 'HIGH') ? 'bg-danger text-white' : 'bg-warn text-ink'
+            }`}
+            aria-label={t('assistant.remindersCount', { n: urgentReminders.length })}
+          >
+            {urgentReminders.length}
+          </span>
+        )}
       </button>
     </header>
   );
