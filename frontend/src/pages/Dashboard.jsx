@@ -12,6 +12,7 @@ import PrecheckWarnings from '../components/dashboard/PrecheckWarnings';
 import SafetyChecklist from '../components/dashboard/SafetyChecklist';
 import ActiveTaskPanel from '../components/dashboard/ActiveTaskPanel';
 import EnvelopeIndicator from '../components/dashboard/EnvelopeIndicator';
+import BehaviourCard from '../components/dashboard/BehaviourCard';
 import ShiftSummary from '../components/dashboard/ShiftSummary';
 import EndShiftForm from '../components/dashboard/EndShiftForm';
 import AlertItem from '../components/alerts/AlertItem';
@@ -158,6 +159,7 @@ export default function Dashboard() {
             <div className="rounded border-2 border-ok text-ok p-4 font-condensed font-bold text-2xl">{t('ready.noTasks')}</div>
           )}
           {envelope && <EnvelopeIndicator envelope={envelope.envelope} distanceM={envelope.distanceM} />}
+          <BehaviourCard />
           <TaskList tasks={tasks} onStart={actions.startTask} nextId={nextTask?.id} />
           {machineCard}
         </>
@@ -169,6 +171,7 @@ export default function Dashboard() {
         <>
           <ActiveTaskPanel task={activeTask} paused={state === 'TASK_PAUSED'} />
           {envelope && <EnvelopeIndicator envelope={envelope.envelope} distanceM={envelope.distanceM} />}
+          <BehaviourCard />
           {machineCard}
           {myAlerts.length > 0 && (
             <div>

@@ -1,71 +1,98 @@
 import { useEffect, useRef } from 'react';
-import { AlertOctagon, BellRing } from 'lucide-react';
+import { AlertOctagon, AlertTriangle, BellRing, ShieldAlert } from 'lucide-react';
 import { useLive } from '../../context/LiveContext';
 import { alertText } from './alertText';
 import { playAlarm, speak, vibrate } from '../../utils/alarm';
 import { speechCode } from '../../i18n';
 
-const REPEAT_MS = 6000;
+const REPEAT_MS = 4000;
+const RANK = { CRITICAL: 0, HIGH: 1, MEDIUM: 2 };
+const UNACKED = ['ALERTED', 'ESCALATED'];
 
-// Full-width red banner for unacknowledged CRITICAL alerts. It sounds, vibrates and
-// reads the alert aloud in the operator's language, and stays until acknowledged.
+const STYLE = {
+  CRITICAL: { box: 'alert-blink text-white', Icon: AlertOctagon, button: 'bg-white text-danger' },
+  HIGH: { box: 'bg-danger text-white', Icon: ShieldAlert, button: 'bg-white text-danger' },
+  MEDIUM: { box: 'bg-warn text-ink', Icon: AlertTriangle, button: 'bg-ink text-warn' },
+};
+
+// Top-of-screen banner for every unacknowledged alert on this machine, most severe first.
+// CRITICAL: blinking banner, flashing screen edge, alarm + vibration every 4 s until acknowledged.
+// HIGH: red banner, one alarm. MEDIUM: amber banner. Every new alert is read aloud once in
+// the operator's language. After acknowledging, a slim strip stays while the hazard is still there.
 export default function AlertBanner() {
   const { t, language, openAlerts, actions } = useLive();
   const announced = useRef(new Set());
 
-  const critical = openAlerts
-    .filter((a) => a.severity === 'CRITICAL' && ['ALERTED', 'ESCALATED'].includes(a.status))
-    .sort((a, b) => b.detectedAt.localeCompare(a.detectedAt));
-  const high = openAlerts.filter((a) => a.severity === 'HIGH' && a.status === 'ALERTED');
-  const top = critical[0];
+  const unacked = openAlerts
+    .filter((a) => UNACKED.includes(a.status) && RANK[a.severity] !== undefined)
+    .sort((a, b) => RANK[a.severity] - RANK[b.severity] || b.detectedAt.localeCompare(a.detectedAt));
+  const stillActive = openAlerts.filter((a) => a.status === 'ACKNOWLEDGED' && !a.conditionCleared);
+  const top = unacked[0];
 
-  // Announce each new CRITICAL/HIGH alert once (voice), keep the alarm tone repeating for CRITICAL.
   useEffect(() => {
-    [...critical, ...high].forEach((a) => {
+    unacked.forEach((a) => {
       if (announced.current.has(a.id)) return;
       announced.current.add(a.id);
       const { title, reason } = alertText(a, t);
-      if (a.severity === 'CRITICAL') {
+      if (a.severity !== 'MEDIUM') {
         playAlarm();
         vibrate();
       }
       speak(`${title}. ${reason}`, speechCode(language));
     });
-  }, [critical, high, t, language]);
+  }, [unacked, t, language]);
 
-  const topId = top?.id;
+  const criticalId = top?.severity === 'CRITICAL' ? top.id : null;
   useEffect(() => {
-    if (!topId) return undefined;
+    if (!criticalId) return undefined;
     const id = setInterval(() => {
       playAlarm();
       vibrate();
     }, REPEAT_MS);
     return () => clearInterval(id);
-  }, [topId]);
+  }, [criticalId]);
 
-  if (!top) return null;
+  if (!top) {
+    if (!stillActive.length) return null;
+    const first = alertText(stillActive[0], t);
+    return (
+      <div role="status" className="bg-warn/15 border-b-4 border-warn text-warn px-4 py-2 flex items-center gap-3 font-condensed font-bold uppercase">
+        <AlertTriangle size={24} strokeWidth={2.5} className="shrink-0" aria-hidden="true" />
+        <span className="flex-1 min-w-0 truncate">
+          {t('alerts.stillActive')}: {first.title}
+          {stillActive.length > 1 ? ` +${stillActive.length - 1}` : ''}
+        </span>
+      </div>
+    );
+  }
+
   const { title, reason } = alertText(top, t);
+  const style = STYLE[top.severity];
+  const { Icon } = style;
 
   return (
-    <div role="alert" className="bg-danger text-white border-b-4 border-black px-4 py-3 flex items-center gap-4">
-      <AlertOctagon size={48} strokeWidth={2.5} className="shrink-0 animate-pulse" aria-hidden="true" />
-      <div className="flex-1 min-w-0">
-        <div className="font-condensed font-bold text-3xl uppercase leading-tight">{title}</div>
-        <div className="text-lg">{reason}</div>
-        {top.status === 'ESCALATED' && (
-          <div className="font-condensed font-bold uppercase flex items-center gap-1">
-            <BellRing size={18} strokeWidth={2.5} /> {t('alertStatus.ESCALATED')}
-          </div>
-        )}
+    <>
+      {top.severity === 'CRITICAL' && <div className="edge-flash" aria-hidden="true" />}
+      <div role="alert" className={`${style.box} border-b-4 border-black px-4 py-3 flex items-center gap-4`}>
+        <Icon size={48} strokeWidth={2.5} className="shrink-0 animate-pulse" aria-hidden="true" />
+        <div className="flex-1 min-w-0">
+          <div className="font-condensed font-bold text-3xl uppercase leading-tight">{title}</div>
+          <div className="text-lg">{reason}</div>
+          {top.status === 'ESCALATED' && (
+            <div className="font-condensed font-bold uppercase flex items-center gap-1">
+              <BellRing size={18} strokeWidth={2.5} /> {t('alertStatus.ESCALATED')}
+            </div>
+          )}
+        </div>
+        {unacked.length > 1 && <div className="font-condensed font-bold text-2xl">+{unacked.length - 1}</div>}
+        <button
+          type="button"
+          onClick={() => actions.acknowledgeAlert(top.id)}
+          className={`shrink-0 h-btn px-6 rounded ${style.button} font-condensed font-bold text-2xl uppercase border-4 border-black`}
+        >
+          {t('alerts.ack')}
+        </button>
       </div>
-      {critical.length > 1 && <div className="font-condensed font-bold text-2xl">+{critical.length - 1}</div>}
-      <button
-        type="button"
-        onClick={() => actions.acknowledgeAlert(top.id)}
-        className="shrink-0 h-btn px-6 rounded bg-white text-danger font-condensed font-bold text-2xl uppercase border-4 border-black"
-      >
-        {t('alerts.ack')}
-      </button>
-    </div>
+    </>
   );
 }

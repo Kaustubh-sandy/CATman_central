@@ -683,6 +683,7 @@ flowchart TD
 | XP and levels | 200 XP per level; `xp:awarded` toast | same |
 | Audit log | Append-only record of every business action: shift transitions, pre-check overrides, checklist mismatches, alerts, incidents, SOS, task steps, training, maintenance tickets. `GET /audit?limit=` | [audit.service.js](backend/src/services/audit.service.js) |
 | Profile | Operator, badges, training progress, last 10 shift safety scores, alerts by rule for the week | [operator.routes.js](backend/src/routes/operator.routes.js) |
+| Safety behaviour | Live seatbelt compliance, this shift's alerts and safety score (`GET /shift/behaviour`, socket `behaviour:updated`); the shift summary uses the same numbers. See [../MANUAL_SAFETY_CONTROLS.md](../MANUAL_SAFETY_CONTROLS.md) | [behaviour.service.js](backend/src/services/behaviour.service.js) |
 | Health | MQTT connected?, storage state, assistant `GEMINI` or `OFFLINE` | [health.routes.js](backend/src/routes/health.routes.js) |
 | Detection scorecard | `npm run evaluate -- --seconds N` listens to MQTT, replays the safety engine and prints precision/recall per scenario against the simulator's labels (the **only** place that reads `scenario`) | [scripts/evaluateDetection.js](backend/src/scripts/evaluateDetection.js) |
 | Dev broker | `npm run broker` starts an in-process MQTT broker (aedes) on 1883 | [scripts/mqttBroker.js](backend/src/scripts/mqttBroker.js) |
@@ -710,7 +711,7 @@ All under `/api`. Operator-scoped endpoints take `operatorId` (query or body).
 
 ## 16. Socket events
 
-`machine:telemetry`, `machine:connectivity`, `eta:updated`, `site:conditions`, `shift:updated`, `precheck:progress`,
+`machine:telemetry`, `machine:connectivity`, `eta:updated`, `behaviour:updated`, `site:conditions`, `shift:updated`, `precheck:progress`,
 `precheck:result`, `task:updated`, `alert:new`, `alert:updated`, `safety:envelope`, `supervisor:escalation`,
 `incident:new`, `incident:updated`, `sos:new`, `operator:updated`, `xp:awarded`, `training:idle_prompt`,
 `training:idle_prompt_cancel`.

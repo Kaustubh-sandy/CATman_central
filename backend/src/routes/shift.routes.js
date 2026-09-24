@@ -5,6 +5,7 @@ const { handle, operatorIdOf } = require('./util');
 const router = express.Router();
 
 router.get('/current', handle((req) => shiftService.getCurrent(operatorIdOf(req))));
+router.get('/behaviour', handle((req) => shiftService.getBehaviour(operatorIdOf(req))));
 
 router.post('/precheck', handle((req) => shiftService.startPrecheck(operatorIdOf(req))));
 router.post('/precheck/cancel', handle((req) => shiftService.cancelPrecheck(operatorIdOf(req))));

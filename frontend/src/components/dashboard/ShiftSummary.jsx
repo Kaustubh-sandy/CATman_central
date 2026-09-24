@@ -1,4 +1,4 @@
-import { RotateCcw, Award, Fuel, Clock, ShieldCheck, AlertTriangle, ListChecks } from 'lucide-react';
+import { RotateCcw, Award, Fuel, Clock, ShieldCheck, AlertTriangle, ListChecks, UserCheck } from 'lucide-react';
 import { useLive } from '../../context/LiveContext';
 import PrimaryButton from '../PrimaryButton';
 
@@ -28,6 +28,14 @@ export default function ShiftSummary({ summary }) {
         <Stat Icon={AlertTriangle} label={t('summary.alerts')} value={summary.alerts.total} tone={summary.alerts.critical ? 'text-danger' : ''} />
         <Stat Icon={ShieldCheck} label={t('summary.safety')} value={summary.safetyScore} tone={scoreTone} />
         <Stat Icon={Award} label={t('summary.xp')} value={`+${summary.xpEarned}`} tone="text-catYellow" />
+        {summary.seatbeltCompliancePct !== undefined && summary.seatbeltCompliancePct !== null && (
+          <Stat
+            Icon={UserCheck}
+            label={t('summary.seatbelt')}
+            value={`${summary.seatbeltCompliancePct}%`}
+            tone={summary.seatbeltCompliancePct >= 98 ? 'text-ok' : summary.seatbeltCompliancePct >= 90 ? 'text-warn' : 'text-danger'}
+          />
+        )}
       </div>
       {summary.handoverNote && (
         <div className="rounded border-2 border-border p-3">

@@ -10,6 +10,7 @@ const taskService = require('./task.service');
 const precheckService = require('./precheck.service');
 const incidentService = require('./incident.service');
 const mqttService = require('./mqtt.service');
+const behaviourService = require('./behaviour.service');
 const behaviorEngine = require('./behaviorEngine.service');
 const { emit } = require('../socket/socket');
 
@@ -109,11 +110,18 @@ function getCurrent(operatorId) {
   return latestShift(operatorId) || createShift(operatorId);
 }
 
+// Two operators can share a machine; the one actually working wins over one who
+// has only opened the dashboard (NOT_STARTED), then the newest shift.
+function shiftActivity(s) {
+  if (s.startedAt) return 2;
+  return s.state === STATES.NOT_STARTED ? 0 : 1;
+}
+
 function getActiveShiftForMachine(machineId) {
   return (
     repo
       .list('shifts', (s) => s.machineId === machineId && s.state !== STATES.SHIFT_ENDED)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] || null
+      .sort((a, b) => shiftActivity(b) - shiftActivity(a) || b.createdAt.localeCompare(a.createdAt))[0] || null
   );
 }
 
@@ -407,11 +415,10 @@ function buildSummary(shift, handoverNote) {
   const fuelUsedL = t && base ? Math.max(0, t.fuelConsumedLitres - base.fuelConsumedLitres) : 0;
   const idleMinutes = t && base ? Math.max(0, t.idleTime - base.idleTime) : 0;
 
-  const alerts = repo.list('alerts', (a) => a.machineId === shift.machineId && a.detectedAt >= since);
-  const bySeverity = (sev) => alerts.filter((a) => a.severity === sev).length;
-  const critical = bySeverity('CRITICAL');
-  const high = bySeverity('HIGH');
-  const medium = bySeverity('MEDIUM');
+  // Alerts, seatbelt compliance and safety score come from the same live
+  // behaviour tracking the operator saw during the shift.
+  const behaviour = behaviourService.finalize(shift);
+  const { critical, high, medium } = behaviour.alerts;
   const sosCount = repo.list('incidents', (i) => i.type === 'SOS' && i.operatorId === shift.operatorId && i.createdAt >= since).length;
 
   const tasks = taskService.getTodayTasks(shift.operatorId).filter((tk) => tk.completedAt && tk.completedAt >= since);
@@ -427,9 +434,14 @@ function buildSummary(shift, handoverNote) {
     fuelCostInr: Math.round(fuelUsedL * config.fuelPriceInr),
     co2Kg: Number((fuelUsedL * CO2_KG_PER_LITRE).toFixed(2)),
     idleMinutes: Number(idleMinutes.toFixed(1)),
-    alerts: { total: alerts.length, critical, high, medium },
+    alerts: { total: behaviour.alerts.total, critical, high, medium },
+    alertsByRule: behaviour.byRule,
+    seatbeltCompliancePct: behaviour.seatbeltCompliancePct,
+    unbeltedWorkingSec: behaviour.unbeltedWorkingSec,
+    workingMin: behaviour.workingMin,
     sosCount,
-    safetyScore: Math.max(0, 100 - critical * 15 - high * 8 - medium * 3),
+    safetyScore: behaviour.safetyScore,
+    safetyPenalties: behaviour.penalties,
     cleanShift,
     xpEarned,
     handoverNote: handoverNote || '',
@@ -448,6 +460,11 @@ function endShift(operatorId, handoverNote) {
     shift.activeTaskId = null;
   }
   shift.summary = buildSummary(shift, handoverNote);
+  shift.behaviour = {
+    workingSec: Math.round(shift.summary.workingMin * 60),
+    safetyScore: shift.summary.safetyScore,
+    seatbeltCompliancePct: shift.summary.seatbeltCompliancePct,
+  };
   shift.endedAt = new Date().toISOString();
   shift.activeSince = null;
   if (shift.startedAt) sendShiftCommand(shift, 'END');
@@ -494,8 +511,13 @@ function init() {
     });
 }
 
+function getBehaviour(operatorId) {
+  return behaviourService.compute(getCurrent(operatorId));
+}
+
 module.exports = {
   STATES,
+  getBehaviour,
   CHECKLIST_ITEMS,
   init,
   getCurrent,

@@ -23,6 +23,7 @@ export function LiveProvider({ children }) {
   const [incidents, setIncidents] = useState([]);
   const [site, setSite] = useState(null);
   const [envelopes, setEnvelopes] = useState({});
+  const [behaviour, setBehaviour] = useState(null);
   const [idlePrompt, setIdlePrompt] = useState(null);
   const [toast, setToast] = useState(null);
   const [alertCenterOpen, setAlertCenterOpen] = useState(false);
@@ -46,7 +47,7 @@ export function LiveProvider({ children }) {
   }, [toast]);
 
   const loadAll = useCallback(async () => {
-    const [op, fleet, sh, tk, al, inc, st] = await Promise.allSettled([
+    const [op, fleet, sh, tk, al, inc, st, bh] = await Promise.allSettled([
       apiClient.get('/operators/me'),
       apiClient.get('/fleet'),
       apiClient.get('/shift/current'),
@@ -54,6 +55,7 @@ export function LiveProvider({ children }) {
       apiClient.get('/alerts', { params: { limit: MAX_ALERTS } }),
       apiClient.get('/incidents'),
       apiClient.get('/site/conditions'),
+      apiClient.get('/shift/behaviour'),
     ]);
     if (op.status === 'fulfilled') setOperator(op.value.data);
     if (fleet.status === 'fulfilled') setMachines(fleet.value.data.machines);
@@ -62,6 +64,7 @@ export function LiveProvider({ children }) {
     if (al.status === 'fulfilled') setAlerts(al.value.data);
     if (inc.status === 'fulfilled') setIncidents(inc.value.data.slice(0, MAX_INCIDENTS));
     if (st.status === 'fulfilled') setSite(st.value.data);
+    if (bh.status === 'fulfilled') setBehaviour(bh.value.data);
   }, []);
 
   useEffect(() => {
@@ -98,6 +101,9 @@ export function LiveProvider({ children }) {
       'incident:new': (i) => setIncidents((prev) => upsert(prev, i, MAX_INCIDENTS)),
       'incident:updated': (i) => setIncidents((prev) => upsert(prev, i, MAX_INCIDENTS)),
       'site:conditions': (s) => setSite((prev) => ({ ...(prev || {}), ...s })),
+      'behaviour:updated': (b) => {
+        if (b.operatorId === operatorRef.current?.operatorId) setBehaviour(b);
+      },
       'safety:envelope': (e) => setEnvelopes((prev) => ({ ...prev, [e.machineId]: e })),
       'training:idle_prompt': (p) => {
         if (p.machineId === shiftRef.current?.machineId) setIdlePrompt(p);
@@ -234,6 +240,8 @@ export function LiveProvider({ children }) {
     mySos,
     site,
     envelope: envelopes[machineId] || null,
+    // Only this shift's numbers (a new shift starts from zero).
+    behaviour: behaviour && behaviour.shiftId === shift?.id ? behaviour : null,
     idlePrompt,
     toast,
     showToast,

@@ -85,7 +85,9 @@ function raise(machineId, condition, shift) {
   }
 
   audit.log('ALERT_RAISED', { operatorId: alert.operatorId, machineId, alertId: alert.id, ruleId: alert.ruleId, severity: alert.severity, reason: alert.reason, evidence: alert.evidence });
-  return save(alert, 'alert:new');
+  const saved = save(alert, 'alert:new');
+  bus.emit('alert:raised', saved);
+  return saved;
 }
 
 function process(machineId, telemetry) {
