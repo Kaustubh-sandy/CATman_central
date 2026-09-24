@@ -210,6 +210,8 @@ function generateSample() {
     2
     );
 
+    
+
   let seatbeltStatus = true;
 
   // ----------------------------------------------------------
@@ -259,6 +261,10 @@ function generateSample() {
     2
     );
 
+    engineRpm = Math.round(
+    clamp(engineRpm, 0, 1800)
+    );
+
     engineTemperature = round(
     clamp(engineTemperature, 60, 125),
     1
@@ -273,6 +279,7 @@ function generateSample() {
     clamp(vibration, 0.05, 3),
     2
     );
+
 
   // ----------------------------------------------------------
   // ETA calculation

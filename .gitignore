@@ -19,3 +19,7 @@ Thumbs.db
 # IDE Files
 .vscode/
 .idea/
+
+.venv/
+__pycache__/
+*.pyc
