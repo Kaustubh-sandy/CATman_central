@@ -97,7 +97,7 @@ function ModuleCard({ module, progress, reason, skillArea, urgency, onStart }) {
 
 export default function ELearning() {
   const navigate = useNavigate();
-  const { t } = useLive();
+  const { t, skillsVersion } = useLive();
   const [modules, setModules] = useState([]);
   const [progress, setProgress] = useState([]);
   const [recommended, setRecommended] = useState([]);
@@ -111,7 +111,7 @@ export default function ELearning() {
         setRecommended(r.data);
       })
       .catch((err) => setError(err.message));
-  }, []);
+  }, [skillsVersion]);
 
   const reasonText = (r) => {
     if (!r || !r.reasonCode) return null;

@@ -1,6 +1,6 @@
 // Task ETA from the Python model (ml/eta/predict.py). The model is the only source
-// of the ETA and its explanation: this service just runs it with the latest
-// telemetry and passes its JSON through unchanged.
+// of the ETA and its explanation: this service just runs it with the 13 trained
+// fields from the latest telemetry and passes its JSON through unchanged.
 //
 // Each run starts a Python process and loads the model (a few seconds), so it only
 // runs for machines with an ACTIVE task, one process per machine at a time, at most
@@ -14,6 +14,25 @@ const bus = require('./bus');
 const { emit } = require('../socket/socket');
 
 const SCRIPT = path.join(__dirname, '..', 'ml', 'eta', 'predict.py');
+
+// The 13 inputs the ETA model was trained on (ml/eta/README.md §6). Only these are
+// sent, so extra telemetry fields (location, operatorPresent, …) never reach the model.
+const ETA_FEATURES = [
+  'machineId', 'state', 'scenario', 'engineHours', 'fuelLevelLitres', 'fuelConsumptionRateLph',
+  'loadCycles', 'idleTime', 'engineRpm', 'engineTemperature', 'hydraulicTemperature', 'vibration',
+  'seatbeltStatus',
+];
+
+function toEtaPayload(telemetry) {
+  const payload = {};
+  const missing = [];
+  ETA_FEATURES.forEach((key) => {
+    if (telemetry[key] === undefined || telemetry[key] === null) missing.push(key);
+    else payload[key] = telemetry[key];
+  });
+  return { payload, missing };
+}
+
 const MAX_OUTPUT_BYTES = 1024 * 1024;
 
 const latest = new Map(); // machineId -> last result (or error) for the active task
@@ -49,11 +68,11 @@ function parseOutput(stdout) {
   }
 }
 
-function runPredictor(telemetry) {
+function runPredictor(etaPayload) {
   return new Promise((resolve, reject) => {
     execFile(
       config.eta.python,
-      [SCRIPT, JSON.stringify(telemetry)],
+      [SCRIPT, JSON.stringify(etaPayload)],
       { timeout: config.eta.timeoutMs, maxBuffer: MAX_OUTPUT_BYTES, windowsHide: true },
       (err, stdout, stderr) => {
         const out = parseOutput(stdout);
@@ -87,7 +106,9 @@ async function predict(machineId, taskId, telemetry) {
   status.runs += 1;
 
   try {
-    const prediction = await runPredictor(telemetry);
+    const { payload, missing } = toEtaPayload(telemetry);
+    if (missing.length) throw new Error(`telemetry is missing ETA inputs: ${missing.join(', ')}`);
+    const prediction = await runPredictor(payload);
     const result = {
       ...prediction,
       machineId,
@@ -155,4 +176,4 @@ function init() {
   console.log(`[ETA] Python model: ${config.eta.python} ${path.relative(process.cwd(), SCRIPT)} (every ${config.eta.intervalMs / 1000} s per active task)`);
 }
 
-module.exports = { init, get, getStatus };
+module.exports = { init, get, getStatus, ETA_FEATURES, toEtaPayload };

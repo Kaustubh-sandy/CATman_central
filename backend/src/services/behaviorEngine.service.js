@@ -241,6 +241,23 @@ function contextMultiplier(observation) {
 
 // ─── Skill scoring ──────────────────────────────────────────────────────
 
+// Metrics scored relative to the operator's own baseline (observed ÷ baseline − 1),
+// e.g. fuelPerCycleRatio 0.25 = 25% more fuel per cycle than usual. The observation
+// stores the raw value; the ratio needs the baseline, so it is derived here.
+const RELATIVE_METRICS = {
+  fuelPerCycleRatio: 'fuelPerCycle',
+  rpmVarianceRatio: 'rpmVariance',
+};
+
+function metricValue(observation, key, baseline) {
+  const source = RELATIVE_METRICS[key];
+  if (!source) return observation.metrics[key];
+  const value = observation.metrics[source];
+  const base = baseline?.[source];
+  if (typeof value !== 'number' || !(base > 0)) return undefined;
+  return value / base - 1;
+}
+
 function scoreSkill(skillId, recentObs, baseline) {
   const skillCfg = T.SKILLS[skillId];
   if (!skillCfg || !baseline) return { score: 50, penalties: [] };
@@ -252,7 +269,7 @@ function scoreSkill(skillId, recentObs, baseline) {
   const avgMetrics = {};
   const metricKeys = Object.keys(skillCfg.metrics);
   metricKeys.forEach((key) => {
-    const values = recentObs.map((o) => o.metrics[key]).filter((v) => typeof v === 'number');
+    const values = recentObs.map((o) => metricValue(o, key, baseline)).filter((v) => typeof v === 'number');
     avgMetrics[key] = values.length ? mean(values) : 0;
   });
 
@@ -437,7 +454,10 @@ function generateRecommendations(operatorId, ledger) {
   const urgencyOrder = { HIGH: 0, MEDIUM: 1, LOW: 2 };
   recs.sort((a, b) => (urgencyOrder[a.urgency] || 2) - (urgencyOrder[b.urgency] || 2));
 
-  return recs;
+  // Two skills can point to the same module (idle and fuel → SIM_SHUTDOWN): keep the
+  // most urgent reason once instead of listing the module twice.
+  const seen = new Set();
+  return recs.filter((r) => (seen.has(r.moduleId) ? false : seen.add(r.moduleId)));
 }
 
 // ─── Post-training evaluation ───────────────────────────────────────────
@@ -478,7 +498,8 @@ function evaluatePostTraining(ledger) {
     // If improved, accelerate baseline update.
     if (improved && ledger.baseline) {
       const latestObs = postObs[postObs.length - 1];
-      ledger.baseline = updateBaseline(ledger.baseline, latestObs, T.BASELINE_ALPHA_FAST);
+      // Same shift, bigger step: keep the shift count (the normal update counts it).
+      ledger.baseline = { ...updateBaseline(ledger.baseline, latestObs, T.BASELINE_ALPHA_FAST), shiftCount: ledger.baseline.shiftCount };
     }
 
     // Emit loop-closed event.
@@ -502,9 +523,14 @@ function evaluatePostTraining(ledger) {
 function onShiftEnd(operatorId, summary, shift) {
   // Skip very short shifts.
   if ((summary.durationMin || 0) < T.MIN_ACTIVE_MINUTES) return null;
+  return ingestObservation(operatorId, buildObservation(operatorId, summary, shift));
+}
 
+// Adds one shift observation to the operator's ledger, then baselines, scores and
+// evaluates training windows. Used at shift end and to replay seeded demo history,
+// so every stored score comes from this code path.
+function ingestObservation(operatorId, observation) {
   const ledger = getLedger(operatorId);
-  const observation = buildObservation(operatorId, summary, shift);
 
   // Append observation (bounded).
   ledger.observations.push(observation);
@@ -512,21 +538,19 @@ function onShiftEnd(operatorId, summary, shift) {
     ledger.observations = ledger.observations.slice(-T.MAX_OBSERVATIONS);
   }
 
-  // Establish or update baseline.
+  // Score this shift against the baseline as it was BEFORE this shift, then fold the
+  // shift into the baseline. Updating first let a bad shift partly become its own
+  // "normal" (a sustained +50% fuel per cycle was never flagged).
   if (!ledger.baseline) {
     if (ledger.observations.length >= T.MIN_SHIFTS_FOR_BASELINE) {
       ledger.baseline = establishBaseline(ledger.observations);
+      ledger.skills = computeAllSkills(ledger);
+      evaluatePostTraining(ledger);
     }
   } else {
-    ledger.baseline = updateBaseline(ledger.baseline, observation);
-  }
-
-  // Compute skills.
-  if (ledger.baseline) {
     ledger.skills = computeAllSkills(ledger);
-
-    // Evaluate any post-training windows.
     evaluatePostTraining(ledger);
+    ledger.baseline = updateBaseline(ledger.baseline, observation);
   }
 
   saveLedger(ledger);
@@ -539,7 +563,7 @@ function onShiftEnd(operatorId, summary, shift) {
   return ledger;
 }
 
-function onTrainingComplete(operatorId, moduleId, { score, maxScore, passed }) {
+function onTrainingComplete(operatorId, moduleId, { score, maxScore, passed, at }) {
   const ledger = getLedger(operatorId);
   if (!ledger.skills) return;
 
@@ -561,7 +585,7 @@ function onTrainingComplete(operatorId, moduleId, { score, maxScore, passed }) {
     trainingScore: score,
     trainingMaxScore: maxScore,
     trainingPassed: passed,
-    completedAt: new Date().toISOString(),
+    completedAt: at || new Date().toISOString(),
     status: 'PENDING',
   };
 
@@ -602,6 +626,7 @@ function getObservations(operatorId, { limit = 10 } = {}) {
 
 module.exports = {
   onShiftEnd,
+  ingestObservation,
   onTrainingComplete,
   getSkills,
   getRecommendations,

@@ -207,3 +207,23 @@ and the telemetry field names read by the rules (`seatbeltStatus`, `operatorPres
    frontend — §7, §9.
 7. Replace the ETA target formula with data recorded from the live simulator before using that model — §10.
 8. Rotate keys, tighten Firestore rules, then `git init` — §11.
+
+## 13. Operator behaviour / skills engine
+
+Checked 24 Sep 2026 (commit "Operator behaviour learning"). The engine itself computes from real shifts; the
+problems are in the seed data and a few constants.
+
+| Item | Where | What is hard-coded | Risk |
+|---|---|---|---|
+| OP1001 skill scores | [db/seedBehavior.js](backend/src/db/seedBehavior.js) | **Fixed (24 Sep):** no longer typed in. 13 synthetic past shifts (the shift metrics are hard-coded demo inputs) and one simulation attempt are replayed through the engine at seed time, so scores, trends, recommendations and the training result are calculated. Replaces only a ledger that holds no real shifts. | 🟡 synthetic history, clearly marked `seeded: true` |
+| Seed overwrite | `npm run seed -- --reset-behavior` | Replacing a ledger that contains real shifts now needs this explicit flag; `--force` no longer touches it | 🟡 |
+| All weights, thresholds, caps, labels, windows | [behaviorThresholds.js](backend/src/services/behaviorThresholds.js) | Central config (by design). Only `BEHAVIOR_MIN_SHIFTS`, `BEHAVIOR_WINDOW_SHIFTS`, `BEHAVIOR_RETRAIN_DAYS` come from `.env` | 🟡 fine |
+| Idle burn 4 L/h | [behaviorEngine.service.js](backend/src/services/behaviorEngine.service.js) `buildObservation` | Same constant as the assistant (§3), not from telemetry | 🟠 |
+| 4 s per reading | same, `computeTelemetryMetrics` | Throttle-chop rate assumes 4 s frames (wrong while manual hazards re-publish every 1 s) | 🟡 |
+| Rule → module table | same, `generateRecommendations` | Copy of `training.service.js`'s table | 🟡 duplicate |
+| "High" urgency tag, penalty line "baseline", raw metric names (`idleRatio`) | [SkillProfile.jsx](frontend/src/pages/SkillProfile.jsx), [SkillScoreCard.jsx](frontend/src/components/SkillScoreCard.jsx) | English text not in the i18n files | 🟡 not translated |
+| Skill colours, order | SkillScoreCard / SkillProfile | UI constants | 🟡 fine |
+
+Frontend pages (Skills, Profile mini-card, E-Learning reasons, loop banner) show only what `/api/behavior/*`
+returns; no scores are hard-coded in the UI. The Skills, Profile and E-Learning pages re-fetch on
+`behavior:skills_updated` (fixed 24 Sep).

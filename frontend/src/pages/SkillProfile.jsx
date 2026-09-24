@@ -13,7 +13,7 @@ const LOOP_STATUS_ICON = {
 };
 
 export default function SkillProfile() {
-  const { t } = useLive();
+  const { t, skillsVersion } = useLive();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [recs, setRecs] = useState([]);
@@ -29,7 +29,7 @@ export default function SkillProfile() {
         setRecs(r.data);
       })
       .catch((err) => setError(err.message));
-  }, []);
+  }, [skillsVersion]);
 
   if (error) {
     return (

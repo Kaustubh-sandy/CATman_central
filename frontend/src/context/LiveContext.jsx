@@ -24,6 +24,8 @@ export function LiveProvider({ children }) {
   const [site, setSite] = useState(null);
   const [envelopes, setEnvelopes] = useState({});
   const [behaviour, setBehaviour] = useState(null);
+  // Bumped when the skill engine re-scores this operator, so skill pages re-fetch.
+  const [skillsVersion, setSkillsVersion] = useState(0);
   const [idlePrompt, setIdlePrompt] = useState(null);
   const [toast, setToast] = useState(null);
   const [alertCenterOpen, setAlertCenterOpen] = useState(false);
@@ -118,6 +120,7 @@ export function LiveProvider({ children }) {
         }
       },
       'behavior:loop_closed': (e) => {
+        if (e.operatorId === operatorRef.current?.operatorId) setSkillsVersion((v) => v + 1);
         if (e.operatorId === operatorRef.current?.operatorId && e.improved) {
           const skill = translate(operatorRef.current?.language || 'en', `skills.area.${e.skillArea}`);
           setToast({
@@ -129,8 +132,8 @@ export function LiveProvider({ children }) {
           if (window.__behaviorLoopHandler) window.__behaviorLoopHandler(e);
         }
       },
-      'behavior:skills_updated': () => {
-        // Skills updated — pages can re-fetch if needed.
+      'behavior:skills_updated': (e) => {
+        if (e.operatorId === operatorRef.current?.operatorId) setSkillsVersion((v) => v + 1);
       },
     };
 
@@ -242,6 +245,7 @@ export function LiveProvider({ children }) {
     envelope: envelopes[machineId] || null,
     // Only this shift's numbers (a new shift starts from zero).
     behaviour: behaviour && behaviour.shiftId === shift?.id ? behaviour : null,
+    skillsVersion,
     idlePrompt,
     toast,
     showToast,

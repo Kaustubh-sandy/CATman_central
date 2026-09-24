@@ -23,7 +23,7 @@ function SafetyTrend({ points }) {
 }
 
 export default function Profile() {
-  const { t } = useLive();
+  const { t, skillsVersion } = useLive();
   const [profile, setProfile] = useState(null);
   const [skills, setSkills] = useState(null);
 
@@ -32,7 +32,7 @@ export default function Profile() {
     apiClient.get('/behavior/skills').then((res) => {
       if (res.data.skills) setSkills(res.data.skills);
     }).catch(() => {});
-  }, []);
+  }, [skillsVersion]);
 
   if (!profile) return <div className="max-w-4xl mx-auto text-white/60 font-condensed text-2xl uppercase">{t('dash.loading')}</div>;
   const op = profile.operator;
