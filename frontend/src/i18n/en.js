@@ -323,6 +323,41 @@ const en = {
   'replay.waiting': 'Recording the 60 s after the event…',
 
   'error.generic': 'Something went wrong',
+
+  'nav.skills': 'Skills',
+
+  'skills.title': 'Operator Skills',
+  'skills.subtitle': 'Your real-world performance across shifts',
+  'skills.notReady': 'Complete {remaining} more shifts to start tracking',
+  'skills.score': 'Score',
+  'skills.trend.UP': '↑ Improving',
+  'skills.trend.DOWN': '↓ Declining',
+  'skills.trend.STABLE': '— Stable',
+  'skills.label.GOOD': 'Good',
+  'skills.label.DEVELOPING': 'Developing',
+  'skills.label.NEEDS_ATTENTION': 'Needs attention',
+  'skills.label.CRITICAL': 'Critical',
+  'skills.area.IDLE_MANAGEMENT': 'Idle Management',
+  'skills.area.FUEL_EFFICIENCY': 'Fuel Efficiency',
+  'skills.area.SMOOTH_OPERATION': 'Smooth Operation',
+  'skills.area.SAFETY_AWARENESS': 'Safety Awareness',
+  'skills.area.TASK_EXECUTION': 'Task Execution',
+  'skills.baseline': 'Baseline from {n} shifts',
+  'skills.observations': '{n} shifts analysed',
+  'skills.recommendedTraining': 'Recommended training',
+  'skills.trainingLoops': 'Training impact',
+  'skills.loopImproved': 'Improved +{delta} pts after training',
+  'skills.loopNoChange': 'No change yet — keep practising',
+  'skills.loopPending': 'Measuring improvement…',
+  'skills.preScore': 'Before',
+  'skills.postScore': 'After',
+  'skills.trainingScore': 'Training score',
+
+  'behavior.loopClosed': '🎉 {skill} improved by {delta} points after training!',
+
+  'learning.reason.SKILL_SCORE_LOW': '{skill} score is {score} — below {threshold}',
+  'learning.reason.SKILL_DECLINING': '{skill} declining for {shifts} shifts',
+  'learning.reason.SAFETY_REPEAT': '{rule} in {count} of last {outOf} shifts',
 };
 
 export default en;

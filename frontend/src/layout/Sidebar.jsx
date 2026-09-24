@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, GraduationCap, History, User, Radio, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LayoutDashboard, GraduationCap, History, User, Radio, PanelLeftClose, PanelLeftOpen, BarChart3 } from 'lucide-react';
 import { useLive } from '../context/LiveContext';
 
 const NAV_ITEMS = [
@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/learning', key: 'nav.learning', Icon: GraduationCap },
   { to: '/history', key: 'nav.history', Icon: History },
   { to: '/profile', key: 'nav.profile', Icon: User },
+  { to: '/skills', key: 'nav.skills', Icon: BarChart3 },
   { to: '/control-room', key: 'nav.controlRoom', Icon: Radio },
 ];
 

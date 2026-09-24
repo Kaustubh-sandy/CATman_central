@@ -323,6 +323,41 @@ const hi = {
   'replay.waiting': 'घटना के बाद के 60 सेकंड रिकॉर्ड हो रहे हैं…',
 
   'error.generic': 'कुछ गलत हुआ',
+
+  'nav.skills': 'कौशल',
+
+  'skills.title': 'ऑपरेटर कौशल',
+  'skills.subtitle': 'शिफ्ट में आपका वास्तविक कार्य प्रदर्शन',
+  'skills.notReady': 'ट्रैकिंग शुरू करने के लिए {remaining} और शिफ्ट पूरी करें',
+  'skills.score': 'स्कोर',
+  'skills.trend.UP': '↑ सुधार हो रहा है',
+  'skills.trend.DOWN': '↓ गिरावट',
+  'skills.trend.STABLE': '— स्थिर',
+  'skills.label.GOOD': 'उत्कृष्ट',
+  'skills.label.DEVELOPING': 'प्रगति पर',
+  'skills.label.NEEDS_ATTENTION': 'ध्यान देने योग्य',
+  'skills.label.CRITICAL': 'गंभीर',
+  'skills.area.IDLE_MANAGEMENT': 'निष्क्रिय समय प्रबंधन (Idle)',
+  'skills.area.FUEL_EFFICIENCY': 'ईंधन दक्षता (Fuel)',
+  'skills.area.SMOOTH_OPERATION': 'सुगम संचालन (Smooth Ops)',
+  'skills.area.SAFETY_AWARENESS': 'सुरक्षा जागरूकता (Safety)',
+  'skills.area.TASK_EXECUTION': 'कार्य निष्पादन (Task Execution)',
+  'skills.baseline': '{n} शिफ्ट से बेसलाइन',
+  'skills.observations': '{n} शिफ्ट का विश्लेषण',
+  'skills.recommendedTraining': 'सुझाया गया प्रशिक्षण',
+  'skills.trainingLoops': 'प्रशिक्षण का वास्तविक प्रभाव',
+  'skills.loopImproved': 'प्रशिक्षण के बाद +{delta} अंक का सुधार',
+  'skills.loopNoChange': 'अभी कोई बदलाव नहीं — अभ्यास जारी रखें',
+  'skills.loopPending': 'सुधार मापा जा रहा है…',
+  'skills.preScore': 'पहले',
+  'skills.postScore': 'बाद में',
+  'skills.trainingScore': 'प्रशिक्षण स्कोर',
+
+  'behavior.loopClosed': '🎉 प्रशिक्षण के बाद {skill} में {delta} अंकों का सुधार हुआ!',
+
+  'learning.reason.SKILL_SCORE_LOW': '{skill} स्कोर {score} है — {threshold} से कम',
+  'learning.reason.SKILL_DECLINING': '{skill} में लगातार {shifts} शिफ्ट से गिरावट',
+  'learning.reason.SAFETY_REPEAT': 'पिछली {outOf} में से {count} शिफ्ट में “{rule}” अलर्ट',
 };
 
 export default hi;

@@ -12,6 +12,7 @@ const shiftService = require('./services/shift.service');
 const alertService = require('./services/alert.service');
 const idleLessonService = require('./services/idleLesson.service');
 const taskService = require('./services/task.service');
+const behaviorEngine = require('./services/behaviorEngine.service');
 const etaService = require('./services/eta.service');
 const bus = require('./services/bus');
 
@@ -35,6 +36,7 @@ app.use('/api/training', require('./routes/training.routes'));
 app.use('/api/assistant', require('./routes/assistant.routes'));
 app.use('/api/site', require('./routes/site.routes'));
 app.use('/api/audit', require('./routes/audit.routes'));
+app.use('/api/behavior', require('./routes/behavior.routes'));
 
 app.use((req, res) => {
   res.status(404).json({ error: `Cannot ${req.method} ${req.originalUrl}` });

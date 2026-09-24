@@ -6,6 +6,7 @@ import AlertCenter from '../components/alerts/AlertCenter';
 import SosStatus from '../components/sos/SosStatus';
 import AssistantPanel from '../assistant/AssistantPanel';
 import IdleLessonPrompt from '../components/IdleLessonPrompt';
+import BehaviorLoopBanner from '../components/BehaviorLoopBanner';
 import Toast from '../components/Toast';
 
 export default function AppShell({ children }) {
@@ -23,6 +24,7 @@ export default function AppShell({ children }) {
       <AssistantPanel />
       <AlertCenter />
       <IdleLessonPrompt />
+      <BehaviorLoopBanner />
       <Toast />
     </div>
   );

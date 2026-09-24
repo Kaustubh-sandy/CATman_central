@@ -10,18 +10,30 @@ const DIFFICULTY_CLASSES = {
   HARD: 'border-danger text-danger',
 };
 
-function ModuleCard({ module, progress, reason, onStart }) {
+function ModuleCard({ module, progress, reason, skillArea, urgency, onStart }) {
   const { t } = useLive();
   const env = module.environment;
   const rain = env.weather === 'RAIN';
 
   return (
     <div className={`flex flex-col rounded border-2 bg-surface p-4 ${reason ? 'border-catYellow' : 'border-border'}`}>
-      <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded border-2 border-catYellow px-2 py-0.5 font-condensed text-sm font-bold uppercase tracking-wide text-catYellow">
-          <Box size={16} strokeWidth={2.5} aria-hidden="true" />
-          3D
-        </span>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 rounded border-2 border-catYellow px-2 py-0.5 font-condensed text-sm font-bold uppercase tracking-wide text-catYellow">
+            <Box size={16} strokeWidth={2.5} aria-hidden="true" />
+            3D
+          </span>
+          {skillArea && (
+            <span className="rounded bg-white/10 px-2 py-0.5 font-condensed text-xs uppercase font-bold tracking-wide text-white/80">
+              {t(`skills.area.${skillArea}`)}
+            </span>
+          )}
+          {urgency === 'HIGH' && (
+            <span className="rounded bg-danger/20 border border-danger px-2 py-0.5 font-condensed text-xs uppercase font-bold tracking-wide text-danger">
+              High Priority
+            </span>
+          )}
+        </div>
         <div className="flex gap-2">
           {progress?.passed && (
             <span className="inline-flex items-center gap-1 rounded border-2 border-ok px-2 py-0.5 font-condensed text-sm font-bold uppercase text-ok">
@@ -101,10 +113,40 @@ export default function ELearning() {
       .catch((err) => setError(err.message));
   }, []);
 
-  const reasonText = (r) =>
-    r.reasonCode === 'ALERTS_THIS_WEEK'
-      ? t('learning.reason.ALERTS_THIS_WEEK', { count: r.params.count, rule: t(`alert.title.${r.params.rule}`) })
-      : t(`learning.reason.${r.reasonCode}`);
+  const reasonText = (r) => {
+    if (!r || !r.reasonCode) return null;
+    if (r.reasonCode === 'SKILL_SCORE_LOW') {
+      return t('learning.reason.SKILL_SCORE_LOW', {
+        skill: t(`skills.area.${r.skillArea}`),
+        score: r.params?.score,
+        threshold: r.params?.threshold,
+      });
+    }
+    if (r.reasonCode === 'SKILL_DECLINING') {
+      return t('learning.reason.SKILL_DECLINING', {
+        skill: t(`skills.area.${r.skillArea}`),
+        shifts: r.params?.shifts,
+      });
+    }
+    if (r.reasonCode === 'SAFETY_REPEAT') {
+      return t('learning.reason.SAFETY_REPEAT', {
+        rule: t(`alert.title.${r.params?.ruleId}`),
+        count: r.params?.count,
+        outOf: r.params?.outOf,
+      });
+    }
+    if (r.reasonCode === 'ALERTS_THIS_WEEK') {
+      return t('learning.reason.ALERTS_THIS_WEEK', {
+        count: r.params?.count,
+        rule: t(`alert.title.${r.params?.rule}`),
+      });
+    }
+    if (r.reasonCode === 'NOT_COMPLETED') {
+      return t('learning.reason.NOT_COMPLETED');
+    }
+    return t(`learning.reason.${r.reasonCode}`);
+  };
+
   const start = (id) => navigate(`/learning/sim/${id}`);
   const topPicks = recommended.slice(0, 2);
 
@@ -127,6 +169,8 @@ export default function ELearning() {
                 module={r.module}
                 progress={progress.find((p) => p.moduleId === r.moduleId)}
                 reason={reasonText(r)}
+                skillArea={r.skillArea}
+                urgency={r.urgency}
                 onStart={start}
               />
             ))}

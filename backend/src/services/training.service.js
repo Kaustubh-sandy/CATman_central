@@ -3,6 +3,13 @@ const repo = require('../db/repo');
 const audit = require('./audit.service');
 const operatorService = require('./operator.service');
 
+// Lazy require to avoid circular dependency (behaviorEngine requires training indirectly via shift).
+let _behaviorEngine = null;
+function behaviorEngine() {
+  if (!_behaviorEngine) _behaviorEngine = require('./behaviorEngine.service');
+  return _behaviorEngine;
+}
+
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const PASS_RATIO = 0.7;
 
@@ -87,6 +94,14 @@ function complete(operatorId, moduleId, { score, maxScore, violations = [], hint
   });
   audit.log('TRAINING_COMPLETED', { operatorId, moduleId, score, maxScore, passed, xpAwarded });
   const operator = operatorService.addXp(operatorId, xpAwarded, `TRAINING_${moduleId}`);
+
+  // Notify behavior engine to open a post-training evaluation window.
+  try {
+    behaviorEngine().onTrainingComplete(operatorId, moduleId, { score, maxScore, passed });
+  } catch (err) {
+    console.error('[Behavior] Error processing training complete:', err.message);
+  }
+
   return { record, operator };
 }
 
@@ -121,6 +136,27 @@ function recommend(operatorId) {
   return [...fromAlerts, ...notDone].map((r) => ({ ...r, module: listModules().find((m) => m.id === r.moduleId) }));
 }
 
+// Extended recommendations: merge behavior-engine recommendations with alert-based/uncompleted (legacy).
+function recommendWithBehavior(operatorId) {
+  let behaviorRecs = [];
+  try {
+    behaviorRecs = behaviorEngine().getRecommendations(operatorId);
+  } catch (err) {
+    console.error('[Behavior] Error getting recommendations:', err.message);
+  }
+
+  // Enrich behavior recommendations with module data.
+  const enrichedBehavior = behaviorRecs
+    .map((r) => ({ ...r, module: listModules().find((m) => m.id === r.moduleId) }))
+    .filter((r) => r.module);
+
+  const behaviorModuleIds = new Set(enrichedBehavior.map((b) => b.moduleId));
+  const legacy = recommend(operatorId).filter((l) => !behaviorModuleIds.has(l.moduleId));
+
+  // Behavior recommendations go first (they are personalized), followed by remaining legacy.
+  return [...enrichedBehavior, ...legacy];
+}
+
 function badges(operatorId) {
   const done = attempts(operatorId);
   const passedIds = new Set(done.filter((a) => a.passed).map((a) => a.moduleId));
@@ -144,7 +180,7 @@ module.exports = {
   getModule,
   complete,
   progress,
-  recommend,
+  recommend: recommendWithBehavior,
   badges,
   attempts,
 };

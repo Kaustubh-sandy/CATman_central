@@ -29,7 +29,9 @@ function init({ shiftLookup }) {
 
     const shift = getShiftForMachine(machineId);
     if (!shift) return;
-    const rec = trainingService.recommend(shift.operatorId)[0];
+    const allRecs = trainingService.recommend(shift.operatorId);
+    // Prefer idle/shutdown recommendation from behavior engine, fallback to first recommendation.
+    const rec = allRecs.find((r) => r.skillArea === 'IDLE_MANAGEMENT' || r.moduleId === 'SIM_SHUTDOWN') || allRecs[0];
     prompted.add(machineId);
     emit('training:idle_prompt', {
       machineId,
